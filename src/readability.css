@@ -1,0 +1,228 @@
+/* Readable information layers over the moving 3D scene. */
+:root {
+  --ink: #eef1e7;
+  --muted: #bbc9c0;
+  --panel: #142522;
+  --line: #50685e;
+  --hud-clearance: 200px;
+  --interaction-height: 46px;
+}
+button, input, select { font-family: inherit; }
+button { font-size: 14px; line-height: 1.5; min-height: 44px; }
+button:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid #f1db9d;
+  outline-offset: 3px;
+}
+button:disabled { opacity: .65; cursor: not-allowed; }
+kbd { font-size: 12px; line-height: 1.4; color: #edf1e7; border-color: #789083; }
+.eyebrow, .modal-panel .modal-eyebrow { font-size: 12px; letter-spacing: 1.6px; line-height: 1.5; }
+
+/* Menus have their own opaque reading surface; the world remains visible around them. */
+#overlay { padding: 24px; background: #061310c9; }
+.modal-panel {
+  width: min(1040px, 100%);
+  max-height: calc(100dvh - 48px);
+  padding: 28px 32px;
+  background: var(--panel);
+  border-color: #738578;
+  scrollbar-color: #7b9384 #142522;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+.modal-panel h2 { font-size: 30px; line-height: 1.4; margin: 12px 0 16px; color: #f0e9d4; }
+.modal-panel p { font-size: 15px; line-height: 1.75; color: #ccd8ce; }
+.modal-panel .modal-footnote {
+  font-size: 13px !important;
+  line-height: 1.65;
+  color: var(--muted) !important;
+  margin-top: 20px !important;
+  padding-top: 14px;
+}
+.modal-actions {
+  position: sticky;
+  bottom: -28px;
+  z-index: 1;
+  margin-top: 20px;
+  padding: 14px 0;
+  background: var(--panel);
+  border-top: 1px solid #50685e;
+}
+.modal-actions > button { font-size: 15px; padding: 12px 18px; min-height: 48px; }
+#overlay[data-mode=home] { background: linear-gradient(90deg, #0e211ef7 0%, #0e211ee6 40%, #0e211e38 80%); }
+#overlay[data-mode=home] .modal-panel { width: 640px; padding: 28px 36px; }
+#overlay[data-mode=home] .modal-actions { position: static; background: transparent; border: 0; padding: 0; }
+#expedition[data-ui=home] .top-hud, #expedition[data-ui=home] .bottom-hud { visibility: hidden; }
+.modal-panel .home-title { font-size: clamp(40px, 4vw, 58px); margin: 20px 0; }
+.home-story { font-size: 17px !important; line-height: 1.8 !important; }
+.camp-links { flex-wrap: wrap; gap: 8px 24px; }
+.camp-links button { font-size: 14px; color: #d4dfd5; min-height: 44px; padding: 8px 0; }
+.home-controls { font-size: 13px; line-height: 1.7; gap: 10px 20px; margin-top: 24px; color: var(--muted); }
+
+/* Descriptions and tradeoffs should be readable before choosing or buying. */
+.reward-options, .inventory-grid, .weapon-choices, .shop-stock { gap: 16px; margin: 22px 0; }
+.relic-card { padding: 22px; min-width: 0; background: #20382f; border-color: #657c6c; }
+button.relic-card:hover { background: #2a4537; border-color: var(--gold); }
+.relic-card .relic-symbol { font-size: 34px; margin-bottom: 12px; }
+.relic-card small, .shop-item-heading small, .weapon-card-top, .weapon-card-top small { font-size: 12px; color: #b7cdbf; }
+.relic-card b, .shop-item h3, .weapon-card h3 { font-size: 20px; line-height: 1.45; }
+.modal-panel .relic-card p, .modal-panel .shop-item p, .modal-panel .weapon-card p { font-size: 14px; line-height: 1.75; }
+.relic-select { font-size: 13px; font-weight: 600; color: #efdcab; margin-top: 18px; }
+.reward-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.modal-panel .reward-toolbar p { margin: 0; font-size: 14px; color: var(--muted); }
+.reward-toolbar button { min-width: 190px; }
+.relic-card.consumed { opacity: .7; }
+[data-rarity="common"] { --rarity-color: #c8d1c7; }
+[data-rarity="rare"] { --rarity-color: #99d0fa; }
+[data-rarity="epic"] { --rarity-color: #d3b2ff; }
+[data-rarity="legendary"] { --rarity-color: #f1cb79; }
+.relic-card[data-rarity], .shop-item[data-rarity] { border-top: 3px solid var(--rarity-color); }
+.relic-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 10px; }
+.rarity-badge { display: inline-flex; align-items: center; flex-shrink: 0; padding: 3px 8px; border: 1px solid var(--rarity-color); color: var(--rarity-color); font-size: 12px; font-weight: 600; line-height: 1.5; letter-spacing: 0; }
+.rarity-guide { margin: 16px 0; border: 1px solid #50685e; background: #142920; }
+.rarity-guide summary { cursor: pointer; min-height: 44px; padding: 11px 14px; font-size: 14px; color: #dce7d9; }
+.rarity-guide summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.rarity-table { width: calc(100% - 28px); margin: 0 14px; border-collapse: collapse; font-size: 14px; }
+.rarity-table caption { padding: 8px 0 12px; text-align: left; color: #c3d1c3; }
+.rarity-table th, .rarity-table td { padding: 7px 0; text-align: left; border-bottom: 1px solid #3d5548; }
+.rarity-table td, .rarity-table thead th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.modal-panel .rarity-guide p { margin: 12px 14px; font-size: 14px; line-height: 1.7; color: #c3d1c3; }
+.inventory-entry .equip-button, .shop-item button, .weapon-card button { font-size: 14px; min-height: 44px; }
+.shop-item, .weapon-card { min-width: 0; padding: 22px; background: #20362e; border-color: #647b6b; }
+.weapon-card.selected { border: 2px solid var(--gold); padding: 21px; background: #293d30; }
+.weapon-emblem { font-size: 42px; margin: 12px 0; }
+.weapon-card h3 { margin: 12px 0; }
+.weapon-card dl, .weapon-card dl div { font-size: 14px; line-height: 1.6; }
+.weapon-unlock { font-size: 13px; line-height: 1.65; color: #c6d4c4; }
+.shop-wallet, .growth-wallet { flex-wrap: wrap; font-size: 15px; gap: 12px 24px; }
+.growth-columns { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; }
+.growth-columns h3 { font-size: 18px; font-weight: 600; }
+.growth-columns h3 small, .growth-wallet small { font-size: 13px; line-height: 1.6; color: var(--muted); }
+.growth-row { gap: 12px; padding: 14px 0; }
+.growth-row b, .growth-goal b { font-size: 15px; line-height: 1.5; }
+.growth-row small, .growth-row span, .growth-goal span, .growth-goal strong { font-size: 13px; line-height: 1.6; color: #c2d1c1; }
+.growth-controls { gap: 8px; flex-shrink: 0; }
+.growth-controls button { width: 44px; min-height: 44px; padding: 6px; font-size: 18px; }
+.growth-controls output { font-size: 16px; min-width: 42px; text-align: center; }
+.growth-controls output small { font-size: 12px; }
+.growth-reset, .growth-feedback { font-size: 14px; line-height: 1.6; }
+.map-legend { font-size: 13px; line-height: 1.7; color: #c5d5c4; }
+.help-grid p { font-size: 14px; }
+.help-grid b { font-size: 16px; }
+
+/* Settings group related controls and keep secondary instructions legible. */
+.sensitivity-heading { font-size: 15px; margin: 20px 0 12px; }
+.sensitivity-scale { font-size: 12px; }
+#mouse-sensitivity { height: 32px; }
+#sensitivity-description, #effects-description { font-size: 14px; }
+button[data-action=reset-sensitivity] { font-size: 14px; padding: 8px 14px; }
+.graphics-settings { margin-top: 20px; }
+.setting-row { font-size: 15px; padding: 12px 0; }
+.setting-row select { color: var(--ink); min-height: 44px; border-color: #7c9485; }
+.setting-row input[type=checkbox] { width: 22px; height: 22px; }
+#settings-status { font-size: 13px; color: #9fe0c5; }
+
+/* Three stable HUD groups leave the center of the scene open. */
+.top-hud { inset: 20px 24px auto; gap: 16px; text-shadow: none; }
+.location, .compass, .mini-map, .vitals, .abilities, .weapon-hud {
+  background: #0c201ded;
+  border: 1px solid #62786c;
+}
+.location { max-width: min(360px, 36%); padding: 12px 16px; }
+.location h1 { font-size: 24px; line-height: 1.4; margin: 6px 0; }
+.location p { font-size: 14px; line-height: 1.55; color: #d4dfd2; }
+.compass { padding: 8px 20px; font-size: 17px; letter-spacing: 2px; }
+.compass span { font-size: 12px; letter-spacing: 0; }
+.mini-map { width: 178px; padding: 10px 12px; }
+.map-heading { font-size: 13px; letter-spacing: 0; }
+.map-heading button { min-height: 32px; font-size: 12px; padding: 3px 7px; }
+.bottom-hud {
+  bottom: 20px; left: 24px; right: 24px;
+  display: grid;
+  grid-template-columns: minmax(230px, 280px) minmax(250px, 320px) minmax(240px, 280px);
+  align-items: end; gap: 16px;
+  text-shadow: none;
+}
+.vitals, .abilities, .weapon-hud { width: auto; padding: 12px 16px; min-width: 0; }
+.hp-value > b { font-size: 38px; font-weight: 600; letter-spacing: -1px; }
+.hp-value > span { font-size: 13px; color: #d1dfd0; }
+.health-track { height: 10px; margin: 8px 0 12px; }
+.resources { font-size: 13px; flex-wrap: wrap; gap: 5px 14px; color: #d3dfcf; }
+.resources > span:last-child { font-size: 12px; color: #acc8b7; }
+.abilities { font-size: 14px; line-height: 1.5; color: #e0ebdf; }
+.abilities > div { grid-template-columns: 60px minmax(0, 1fr); gap: 5px 10px; margin-top: 8px; }
+.abilities > div:first-child { margin-top: 0; }
+.abilities b { font-weight: 600; color: #eadeb7; }
+.abilities > p { margin: 10px 0 0; font-size: 13px; line-height: 1.5; }
+.abilities > p:empty { display: none; }
+.ability-track { height: 5px; }
+#time-status { font-size: 13px; color: #e1c9f1; }
+.weapon-hud .eyebrow { font-size: 11px; letter-spacing: 1px; }
+.weapon-hud h2 { font-size: 23px; line-height: 1.4; margin: 6px 0 10px; }
+.weapon-hud p { flex-wrap: wrap; font-size: 13px; gap: 8px; }
+.weapon-hud #weapon-stats { font-variant-numeric: tabular-nums; color: #dce6d7; margin: 0 0 6px; }
+.weapon-hud #fang-status, .weapon-hud #crown-status { color: #b7c8b9; margin: 0 0 8px; }
+.weapon-hud #fang-status[data-active="true"], .weapon-hud #crown-status[data-active="true"] { color: #f2c277; }
+.weapon-hud button { min-height: 36px; font-size: 13px; padding: 5px 8px; background: #1c352b; }
+.weapon-hud kbd { font-size: 12px; }
+#boss-hud { top: 144px; width: min(620px, 56%); padding: 12px 16px; background: #201e1bea; border: 1px solid #b6936b; text-shadow: none; }
+.boss-heading { font-size: 16px; gap: 10px; }
+.boss-heading small, .boss-heading b { font-size: 13px; }
+.boss-track { height: 9px; }
+#boss-pattern { font-size: 14px; line-height: 1.6; margin: 10px 0 0; color: #ffe0b4; }
+.notice { font-size: 15px; line-height: 1.6; max-width: 80%; text-align: center; background: #142622f2; border: 1px solid #a89769; }
+#interact { bottom: var(--hud-clearance); font-size: 15px; background: #182f26; border-color: #d9c594; }
+.capture-hint {
+  bottom: calc(var(--hud-clearance) + var(--interaction-height) + 12px);
+  width: max-content; max-width: min(520px, 70%);
+  font-size: 13px; line-height: 1.6; text-align: center;
+  background: #10251fee; border: 1px solid #526f5b;
+}
+.weak-status { left: 24px; bottom: var(--hud-clearance); font-size: 14px; line-height: 1.6; max-width: 30%; }
+.slow-status { bottom: calc(var(--hud-clearance) + 44px); }
+#fps-counter { top: 4px; left: calc(50% + 64px); transform: none; font-size: 13px; background: #10251fed; }
+
+@media (max-width: 1100px) {
+  .bottom-hud { grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(190px, 1fr); gap: 12px; }
+  .vitals, .abilities, .weapon-hud { padding: 10px 12px; }
+  .growth-columns { grid-template-columns: 1fr; }
+  .location { max-width: 34%; }
+  .weapon-hud .eyebrow { font-size: 10px; letter-spacing: .5px; }
+}
+@media (max-width: 760px) {
+  #overlay { padding: 12px; }
+  .modal-panel { padding: 20px; max-height: calc(100dvh - 24px); }
+  .modal-panel h2 { font-size: 26px; }
+  .modal-actions { bottom: -20px; }
+  .reward-options, .inventory-grid, .altar-options, .shop-stock, .weapon-choices { grid-template-columns: 1fr; }
+  .top-hud { inset: 12px 16px auto; }
+  .location { max-width: calc(100% - 156px); padding: 10px 12px; }
+  .location h1 { font-size: 20px; }
+  .mini-map { width: 136px; }
+  .compass { display: none; }
+  .bottom-hud { left: 16px; right: 16px; bottom: 12px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .abilities { display: block; grid-row: 1 / 3; grid-column: 2; }
+  .vitals { grid-row: 1; grid-column: 1; }
+  .weapon-hud { grid-row: 2; grid-column: 1; text-align: left; }
+  .weapon-hud h2 { font-size: 19px; }
+  .weapon-hud .eyebrow { display: none; }
+  .weapon-hud p { justify-content: flex-start; }
+  .weapon-hud p > span { display: inline; }
+  .resources > span:last-child { display: none; }
+  #boss-hud { width: calc(100% - 32px); top: 136px; }
+  .weak-status { left: 16px; max-width: 45%; }
+  .capture-hint { max-width: 90%; }
+  #fps-counter { left: auto; right: 164px; top: 12px; transform: none; }
+}
+@media (max-width: 760px) and (max-height: 600px) {
+  #interact { left: calc(75% - 8px); bottom: var(--ability-clearance); }
+  .capture-hint { display: none; }
+}
+@media (max-width: 440px) {
+  .growth-row { flex-wrap: wrap; }
+  .growth-controls { margin-left: auto; }
+  .home-controls { grid-template-columns: 1fr; }
+  #overlay[data-mode=home] .modal-panel { padding: 20px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button, .notice, .health-track i, .boss-track i, .ability-track i, #damage-veil { transition: none; }
+}
