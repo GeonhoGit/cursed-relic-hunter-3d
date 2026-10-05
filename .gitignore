@@ -7,3 +7,7 @@ graphics-review/
 .env.*
 !.env.example
 *.log
+__pycache__/
+*.pyc
+*.blend[0-9]
+art/**/*-frames/

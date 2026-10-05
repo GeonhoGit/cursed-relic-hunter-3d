@@ -1,0 +1,93 @@
+[
+  {
+    "kind": "heartguard",
+    "samples": [
+      {
+        "frame": 135,
+        "edge_alignment": 0.3074245657771826,
+        "flat_face_alignment": 0.9515725076198578
+      },
+      {
+        "frame": 136,
+        "edge_alignment": 0.14834449742920697,
+        "flat_face_alignment": 0.9889357226675202
+      },
+      {
+        "frame": 137,
+        "edge_alignment": 0.5468467324972153,
+        "flat_face_alignment": 0.8372326754033566
+      },
+      {
+        "frame": 138,
+        "edge_alignment": 0.6254596412181854,
+        "flat_face_alignment": 0.7802566215395927
+      },
+      {
+        "frame": 170,
+        "edge_alignment": 0.26327795162796974,
+        "flat_face_alignment": 0.9647200852632523
+      },
+      {
+        "frame": 171,
+        "edge_alignment": 0.4061281904578209,
+        "flat_face_alignment": 0.913816012442112
+      },
+      {
+        "frame": 172,
+        "edge_alignment": 0.6788296848535538,
+        "flat_face_alignment": 0.7342958524823189
+      }
+    ],
+    "minimum_edge_alignment": 0.14834449742920697,
+    "mean_edge_alignment": 0.4251873234087335,
+    "maximum_flat_face_alignment": 0.9889357226675202
+  },
+  {
+    "kind": "voidknight",
+    "samples": [
+      {
+        "frame": 148,
+        "edge_alignment": 0.3939870670437813,
+        "flat_face_alignment": 0.9191160276532173
+      },
+      {
+        "frame": 149,
+        "edge_alignment": 0.32834915816783905,
+        "flat_face_alignment": 0.9445563554763794
+      },
+      {
+        "frame": 150,
+        "edge_alignment": 0.1432301588356495,
+        "flat_face_alignment": 0.9896894842386246
+      },
+      {
+        "frame": 151,
+        "edge_alignment": 0.1403400106355548,
+        "flat_face_alignment": 0.9901034459471703
+      },
+      {
+        "frame": 152,
+        "edge_alignment": 0.400026086717844,
+        "flat_face_alignment": 0.9165036901831627
+      },
+      {
+        "frame": 153,
+        "edge_alignment": 0.5519353747367859,
+        "flat_face_alignment": 0.8338869139552116
+      },
+      {
+        "frame": 154,
+        "edge_alignment": 0.6156748384237289,
+        "flat_face_alignment": 0.7880002856254578
+      },
+      {
+        "frame": 155,
+        "edge_alignment": 0.632225438952446,
+        "flat_face_alignment": 0.7747843340039253
+      }
+    ],
+    "minimum_edge_alignment": 0.1403400106355548,
+    "mean_edge_alignment": 0.4007210166892037,
+    "maximum_flat_face_alignment": 0.9901034459471703
+  }
+]

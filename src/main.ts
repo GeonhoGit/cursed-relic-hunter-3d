@@ -6,7 +6,7 @@ import { FpsControls } from './game/fps-controls';
 import { GameAudio } from './game/audio';
 import { createDungeonRun, step } from './core/simulation';
 import { FixedLoop } from './core/loop';
-import { RenderTiming } from './core/render-timing';
+import { AdaptiveQuality, RenderTiming, validGraphicsMode } from './core/render-timing';
 import { captureMotion, interpolateMotion, type MotionFrame } from './game/render-motion';
 import { currentRoom } from './core/dungeon';
 import { canOpenTreasure, chooseRelic, leaveAltar, openTreasure, rerollReward, roomInfo, roomReward } from './core/expedition';
@@ -47,12 +47,13 @@ const combatHud = new CombatHud();
 const store = new SaveStore('cursed-relic-hunter-3d-v1');
 const audio = new GameAudio(), clock = new FixedLoop();
 const renderTiming = new RenderTiming(); renderTiming.reset(performance.now());
+const adaptiveQuality = new AdaptiveQuality();
 let previousMotion: MotionFrame | null = null;
 let run: RunState | null = null, record: SaveRecord | null = null, profile = defaultProfile();
 let settings = defaultSettings(), modal = 'home', busy = false, storageError = '';
 let closeTo = '';
 let growthDraft = emptyInvestment(), weaponDraft: WeaponId = 'W01';
-let lastFrame = 0, lastCue = 0, noticeUntil = 0;
+let lastFrame = 0, lastCue = 0, noticeUntil = 0, lastQualitySample = 0, lastHudUpdate = 0;
 const preview = createDungeonRun(42);
 let world: World;
 try { world = new World($('world')); }
@@ -98,7 +99,7 @@ function homeMarkup() {
 }
 function showModal(next: string) {
   if (['help', 'inventory', 'map', 'settings'].includes(next)) closeTo = ['home', 'pause', 'performance-pause'].includes(modal) ? modal : '';
-  modal = next; $('expedition').dataset.ui = next; controls.clear(); clock.reset(); previousMotion = null; if (document.pointerLockElement) document.exitPointerLock();
+  modal = next; $('expedition').dataset.ui = next; controls.clear(); clock.reset(); adaptiveQuality.resetSamples(); previousMotion = null; if (document.pointerLockElement) document.exitPointerLock();
   $('overlay').hidden = false; $('overlay').dataset.mode = next;
   let html = '';
   if (next === 'home') html = homeMarkup();
@@ -109,7 +110,7 @@ function showModal(next: string) {
     <div class="sensitivity-scale"><span>느리게 · 0.20배</span><span>빠르게 · 3.00배</span></div>
     <p id="sensitivity-description">숫자가 높을수록 같은 마우스 움직임으로 시점이 더 빠르게 돌아갑니다. 기본 감도는 1.00배입니다.</p>
     ${button('reset-sensitivity', '기본 감도로 복원')}
-    <div class="graphics-settings"><div class="setting-row"><label for="fps-limit">최대 FPS</label><select id="fps-limit">${[30, 60, 120, 144, 0].map(fps => `<option value="${fps}" ${settings.fps === fps ? 'selected' : ''}>${fps ? `${fps} FPS${fps === 60 ? ' · 기본' : ''}` : '제한 없음'}</option>`).join('')}</select></div>
+    <div class="graphics-settings"><div class="setting-row"><label for="graphics-quality">그래픽 품질</label><select id="graphics-quality"><option value="auto" ${settings.graphicsQuality === 'auto' ? 'selected' : ''}>자동 · 60FPS 목표</option><option value="low" ${settings.graphicsQuality === 'low' ? 'selected' : ''}>낮음 · 성능 우선</option><option value="high" ${settings.graphicsQuality === 'high' ? 'selected' : ''}>높음 · 화질 우선</option></select></div><div class="setting-row"><label for="fps-limit">최대 FPS</label><select id="fps-limit">${[30, 60, 120, 144, 0].map(fps => `<option value="${fps}" ${settings.fps === fps ? 'selected' : ''}>${fps ? `${fps} FPS${fps === 60 ? ' · 기본' : ''}` : '제한 없음'}</option>`).join('')}</select></div>
     <label class="setting-row" for="show-fps"><span>FPS 표시</span><input id="show-fps" type="checkbox" ${settings.showFps ? 'checked' : ''}></label>
     <label class="setting-row" for="reduced-motion"><span>효과 감소</span><input id="reduced-motion" type="checkbox" ${settings.reducedMotion ? 'checked' : ''} aria-describedby="effects-description"></label></div>
     <p id="effects-description">효과 감소는 걷기 흔들림, 사격 섬광, 장식 입자와 빛 번짐을 끕니다. 공격 위험 표시와 탄환은 유지됩니다.</p><p class="modal-footnote">FPS는 화면 출력 상한입니다. 실제 출력은 화면 주사율과 PC 성능에 따라 달라지며 전투 속도는 바뀌지 않습니다.</p>
@@ -150,7 +151,7 @@ function showModal(next: string) {
 }
 function resume() {
   if (!playable()) return;
-  modal = ''; $('expedition').dataset.ui = ''; $('overlay').hidden = true; controls.clear(); clock.reset(); previousMotion = null; lastFrame = performance.now(); renderTiming.reset(lastFrame);
+  modal = ''; $('expedition').dataset.ui = ''; $('overlay').hidden = true; controls.clear(); clock.reset(); adaptiveQuality.resetSamples(); previousMotion = null; lastFrame = performance.now(); renderTiming.reset(lastFrame);
   audio.unlock(); controls.lock();
 }
 function togglePause() {
@@ -221,7 +222,7 @@ $('panel').addEventListener('click', async e => {
     else if (action.startsWith('growth-add-') || action.startsWith('growth-sub-')) {
       growthDraft = changeInvestment(growthDraft, action.slice(11) as GrowthStat, action.startsWith('growth-add') ? 1 : -1, earnedPoints(profile)); showModal('growth');
     } else if (action === 'growth-reset') { growthDraft = emptyInvestment(); showModal('growth'); }
-    else if (action === 'growth-save') { if (await persist(growthDraft)) { notice('성장 투자 저장됨 · 다음 탐험부터 적용'); showModal('home'); } }
+    else if (action === 'growth-save') { if (await persist(growthDraft, undefined, run ?? record?.run ?? null)) { notice('성장 투자 저장됨 · 다음 탐험부터 적용'); showModal('home'); } }
     else if (action === 'weapons') { weaponDraft = selectedWeapon(profile); showModal('weapons'); }
     else if (action.startsWith('weapon-pick-')) { const id = action.slice(12) as WeaponId; if (weaponUnlocked(profile, id)) weaponDraft = id; showModal('weapons'); }
     else if (action === 'weapon-save') { if (await persist(undefined, weaponDraft, run ?? record?.run ?? null)) showModal('home'); }
@@ -245,7 +246,13 @@ $('panel').addEventListener('input', e => {
 });
 $('panel').addEventListener('change', e => {
   const input = e.target as HTMLInputElement;
-  if (input.id === 'fps-limit') {
+  if (input.id === 'graphics-quality') {
+    if (!validGraphicsMode(input.value)) return;
+    settings.graphicsQuality = input.value;
+    adaptiveQuality.setMode(input.value);
+    world.setQuality(adaptiveQuality.level);
+    lastQualitySample = 0;
+  } else if (input.id === 'fps-limit') {
     const value = Number(input.value);
     if (![0, 30, 60, 120, 144].includes(value)) return;
     settings.fps = value; clock.reset(); previousMotion = null;
@@ -284,11 +291,19 @@ function frame(now: number) {
   if (active() && clock.shouldPause) { showModal('performance-pause'); audio.suspend(); void persist(); }
   if (renderTiming.due(now, settings.fps)) {
     const s = run ?? preview;
-    combatHud.update(s, { modal, yaw: controls.yaw, reducedMotion: settings.reducedMotion,
-      mouseCaptured: document.pointerLockElement === world.renderer.domElement, noticeUntil });
+    if (!lastHudUpdate || now - lastHudUpdate >= 100) {
+      lastHudUpdate = now;
+      combatHud.update(s, { modal, yaw: controls.yaw, reducedMotion: settings.reducedMotion,
+        mouseCaptured: document.pointerLockElement === world.renderer.domElement, noticeUntil });
+    }
     world.paint(s, run ? controls.yaw : -Math.PI / 2, run ? controls.pitch : -0.04, active() && controls.moving, !!modal,
       { reducedMotion: settings.reducedMotion, motion: active() ? interpolateMotion(s, previousMotion, clock.alpha) : undefined });
     renderTiming.rendered(now);
+    if (now - lastQualitySample >= 500 && renderTiming.fps > 0) {
+      lastQualitySample = now;
+      const level = adaptiveQuality.sample(now, renderTiming.fps, active(), settings.fps);
+      world.setQuality(level);
+    }
     $('fps-counter').hidden = !settings.showFps;
     $('fps-counter').textContent = renderTiming.fps ? `${renderTiming.fps} FPS` : 'FPS 측정 중';
   }
@@ -297,6 +312,7 @@ function frame(now: number) {
 async function boot() {
   try { record = await store.load(); settings = { ...defaultSettings(), ...record?.settings }; profile = recordGrowth(record?.profile ?? defaultProfile(), record?.run ?? null); }
   catch (error) { storageError = error instanceof Error ? error.message : String(error); }
+  adaptiveQuality.setMode(settings.graphicsQuality ?? 'auto'); world.setQuality(adaptiveQuality.level);
   audio.enabled = settings.sound; $('save-status').textContent = storageError ? '저장 기록 오류' : '3D 탐험 기록';
   showModal(storageError ? 'storage-error' : 'home'); requestAnimationFrame(frame);
 }

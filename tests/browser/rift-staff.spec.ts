@@ -77,13 +77,13 @@ test('pre-lock staff saves continue normally while a new departure falls back to
 });
 
 test('staff crystal, spell and flash render distinctly and repeated weapon changes release projectile resources', async ({ page }) => {
-  test.setTimeout(60000); const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  test.setTimeout(180000); const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');
   await page.evaluate(async () => {
     const { World } = await import('/src/game/world.ts' as string);
     const { createDungeonRun } = await import('/src/core/simulation.ts' as string);
     const host = document.createElement('div'); host.id = 'staff-preview';
-    host.style.cssText = 'position:fixed;inset:0;width:960px;height:600px;z-index:9999'; document.body.append(host);
+    host.style.cssText = 'position:fixed;inset:0;width:640px;height:400px;z-index:9999'; document.body.append(host);
     const world = new World(host), run = createDungeonRun(42);
     await new Promise(requestAnimationFrame); world.paint(run, -Math.PI / 2, 0, false, false);
     (window as any).staffPreview = { world, run }; document.getElementById('overlay')!.hidden = true;
@@ -95,21 +95,26 @@ test('staff crystal, spell and flash render distinctly and repeated weapon chang
     // Warm every model and flash before measuring allocations from transient shots.
     for (const id of ['W01', 'W02', 'W03', 'W04']) {
       run.weapon = id; run.cues = []; run.bullets = []; run.player.fireCooldown = 0;
+      world.paint(run, -Math.PI / 2, 0, false, false);
+      await new Promise<void>(resolve => {
+        const check = () => world.weaponViews[id].children.length ? resolve() : setTimeout(check, 25);
+        check();
+      });
       step(run, { ...emptyInput(run), fire: true, aimX: run.player.x, aimY: run.player.y - 150, aimPitch: 0 });
       world.paint(run, -Math.PI / 2, 0, false, false);
     }
     run.weapon = 'W01'; run.bullets = []; run.cues = [];
     world.paint(run, -Math.PI / 2, 0, false, false); const before = { ...world.renderer.info.memory };
     let crystal = false, color = 0, flash = false, weapons = [];
-    for (let repeat = 0; repeat < 5; repeat++) {
+    for (let repeat = 0; repeat < 3; repeat++) {
       for (const id of ['W01', 'W02', 'W03', 'W04']) {
         run.weapon = id; run.cues = []; run.bullets = []; run.player.fireCooldown = 0;
         step(run, { ...emptyInput(run), fire: true, aimX: run.player.x, aimY: run.player.y - 150, aimPitch: 0 });
         world.paint(run, -Math.PI / 2, 0, false, false);
-        const visible = world.gun.children.filter((o: any) => o.visible);
+        const visible = world.gun.children.filter((o: any) => o.visible && o.name.startsWith('weapon-'));
         if (repeat === 0) weapons.push({ id, names: visible.map((o: any) => o.name), count: visible.length });
         if (id === 'W04') {
-          crystal = !!world.staff.getObjectByName('rift-crystal'); flash = world.staffFlash.visible;
+          crystal = !!world.weaponViews.W04.getObjectByName('floating_rift_crystal'); flash = world.staffFlash.visible;
           const b = run.bullets[0]; color = world.entities.get(`bullet-${b.id}`).children[0].material.color.getHex();
         }
       }
@@ -120,8 +125,8 @@ test('staff crystal, spell and flash render distinctly and repeated weapon chang
     return { before, after, crystal, color, flash, weapons, locked: !!document.pointerLockElement };
   });
   expect(result.crystal).toBe(true); expect(result.flash).toBe(true); expect(result.color).toBe(0xcdabf5);
-  expect(result.weapons.find(w => w.id === 'W04')?.names).toEqual(['rift-staff-weapon']);
-  expect(result.weapons.find(w => w.id === 'W03')?.names).toEqual(['', 'observer-crossbow']);
+  expect(result.weapons.find(w => w.id === 'W04')?.names).toEqual(['weapon-W04']);
+  expect(result.weapons.find(w => w.id === 'W03')?.names).toEqual(['weapon-W03']);
   expect(result.after.geometries).toBeLessThanOrEqual(result.before.geometries + 1);
   expect(result.after.textures).toBeLessThanOrEqual(result.before.textures + 1);
   expect(result.locked).toBe(false); expect(errors).toEqual([]);

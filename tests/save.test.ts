@@ -216,6 +216,16 @@ describe('atomic local saves', () => {
     await store.save(null, { ...defaultSettings(), mouseSensitivity: 0.45 });
     expect((await new SaveStore(name).load())?.settings.mouseSensitivity).toBe(0.45);
   });
+  it('persists graphics mode, accepts legacy settings and rejects unknown modes', async () => {
+    expect(defaultSettings()).toMatchObject({ graphicsQuality: 'auto' });
+    const name = `graphics-${++count}`, store = new SaveStore(name); await store.load();
+    const legacy = { ...defaultSettings() } as any; delete legacy.graphicsQuality;
+    await store.save(createRun(4), legacy);
+    expect((await store.load())?.run?.seed).toBe(4);
+    await store.save(null, { ...defaultSettings(), graphicsQuality: 'low' } as any);
+    expect((await new SaveStore(name).load())?.settings.graphicsQuality).toBe('low');
+    await expect(store.save(null, { ...defaultSettings(), graphicsQuality: 'unknown' } as any)).rejects.toThrow();
+  });
   it('rejects invalid sensitivity without overwriting the existing save', async () => {
     const store = new SaveStore(`sensitivity-invalid-${++count}`); await store.load();
     await store.save(createRun(7), defaultSettings());

@@ -17,6 +17,18 @@ export function ring(parent: THREE.Object3D, radius: number, color: number, x = 
   const m = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.018, 5, 48), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 }));
   m.rotation.x = Math.PI / 2; m.position.set(x, 0.03, z); parent.add(m); return m;
 }
+
+export function spikeField(width: number, depth: number, height: number, color: number, y = height / 2) {
+  const positions: [number, number][] = [];
+  for (let x = -width / 2 + 0.16; x < width / 2; x += 0.34)
+    for (let z = -depth / 2 + 0.16; z < depth / 2; z += 0.34) positions.push([x, z]);
+  const mesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.075, height, 5), material(color), positions.length);
+  mesh.name = 'spike-instances';
+  const transform = new THREE.Matrix4();
+  positions.forEach(([x, z], i) => mesh.setMatrixAt(i, transform.makeTranslation(x, y, z)));
+  mesh.instanceMatrix.needsUpdate = true;
+  return mesh;
+}
 export function label(parent: THREE.Object3D, text: string, x: number, y: number, z: number, color: number) {
   const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 96;
   const ctx = canvas.getContext('2d')!; ctx.textAlign = 'center'; ctx.font = '500 37px sans-serif';

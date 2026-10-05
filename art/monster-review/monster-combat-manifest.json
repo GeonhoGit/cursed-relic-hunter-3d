@@ -1,0 +1,130 @@
+{
+  "game_applied": false,
+  "fps": 24,
+  "frames": 240,
+  "segments": {
+    "idle": [
+      1,
+      24
+    ],
+    "walk": [
+      25,
+      120
+    ],
+    "attack": [
+      121,
+      192
+    ],
+    "hit": [
+      193,
+      240
+    ]
+  },
+  "models": [
+    {
+      "kind": "rat",
+      "name": "돌쥐",
+      "attack": "몸을 낮춘 뒤 짧게 덮치기",
+      "attack_max_vertex_displacement": 0.24358374312200415,
+      "hit_max_vertex_displacement": 0.2075217796652667
+    },
+    {
+      "kind": "archer",
+      "name": "금 간 궁수",
+      "attack": "쇠뇌 조준·시위 방출·발사 반동",
+      "attack_max_vertex_displacement": 0.04738554762107336,
+      "hit_max_vertex_displacement": 0.3855791749439459
+    },
+    {
+      "kind": "guard",
+      "name": "돌진 파수꾼",
+      "attack": "상체를 낮춘 돌진 준비와 전진",
+      "attack_max_vertex_displacement": 0.2967841540931287,
+      "hit_max_vertex_displacement": 0.5254691245920694
+    },
+    {
+      "kind": "shield",
+      "name": "방패 망령",
+      "attack": "방패로 막으며 창 찌르기",
+      "attack_max_vertex_displacement": 1.1594246378140927,
+      "hit_max_vertex_displacement": 0.489940546554566
+    },
+    {
+      "kind": "ashpriest",
+      "name": "재의 사제",
+      "attack": "지팡이 들기와 화염 시전",
+      "attack_max_vertex_displacement": 0.7869943234151541,
+      "hit_max_vertex_displacement": 0.4355513082472551
+    },
+    {
+      "kind": "watcher",
+      "name": "궤도 감시자",
+      "attack": "눈 집중과 궤도 가속",
+      "attack_max_vertex_displacement": 0.8531414937803238,
+      "hit_max_vertex_displacement": 0.9577655223368617
+    },
+    {
+      "kind": "heartguard",
+      "name": "심장 수호병",
+      "attack": "검으로 두 차례 연속 베기",
+      "attack_max_vertex_displacement": 0.13422204612968952,
+      "hit_max_vertex_displacement": 0.552235599942515
+    },
+    {
+      "kind": "riftshaman",
+      "name": "균열 주술사",
+      "attack": "지팡이 들기와 균열 시전",
+      "attack_max_vertex_displacement": 0.8197857118961451,
+      "hit_max_vertex_displacement": 0.4511978857893653
+    },
+    {
+      "kind": "voidknight",
+      "name": "공허 기사",
+      "attack": "검을 크게 들어 사선 베기",
+      "attack_max_vertex_displacement": 0.12557491024001202,
+      "hit_max_vertex_displacement": 0.5592199581509121
+    },
+    {
+      "kind": "sealcaster",
+      "name": "봉인술사",
+      "attack": "봉인판 들어 올리기와 밀어내기",
+      "attack_max_vertex_displacement": 0.17465355027812957,
+      "hit_max_vertex_displacement": 0.413963547769481
+    },
+    {
+      "kind": "chainhound",
+      "name": "사슬 사냥개",
+      "attack": "턱 벌리기·전진·물기",
+      "attack_max_vertex_displacement": 0.2225409468533709,
+      "hit_max_vertex_displacement": 0.24131348395400168
+    },
+    {
+      "kind": "readerstatue",
+      "name": "독서 석상",
+      "attack": "책 들어 올리기와 광선 집중",
+      "attack_max_vertex_displacement": 0.1843252996665248,
+      "hit_max_vertex_displacement": 0.28007462807258593
+    },
+    {
+      "kind": "gatekeeper",
+      "name": "문지기",
+      "attack": "양팔 들기와 무거운 내려찍기",
+      "attack_max_vertex_displacement": 0.8850622274700293,
+      "hit_max_vertex_displacement": 0.9071190406413968
+    },
+    {
+      "kind": "chainpriest",
+      "name": "사슬 사제",
+      "attack": "팔을 펼쳐 사슬 휘두르기",
+      "attack_max_vertex_displacement": 0.3483587989767745,
+      "hit_max_vertex_displacement": 0.6613027362715609
+    },
+    {
+      "kind": "relicheart",
+      "name": "유물 심장",
+      "attack": "심장 수축·팽창과 궤도 방출",
+      "attack_max_vertex_displacement": 1.6659242192938302,
+      "hit_max_vertex_displacement": 1.9849822540099513
+    }
+  ]
+}

@@ -1,0 +1,171 @@
+{
+  "status": "awaiting_user_review",
+  "game_applied": false,
+  "models": [
+    {
+      "kind": "rat",
+      "name": "돌쥐",
+      "height": 0.72,
+      "width": 0.6712781789912187,
+      "depth": 2.1802217740869305,
+      "vertices": 2184,
+      "triangles": 4224,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "archer",
+      "name": "금 간 궁수",
+      "height": 1.84,
+      "width": 0.9317986157697531,
+      "depth": 1.1631188797131498,
+      "vertices": 3000,
+      "triangles": 5820,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "guard",
+      "name": "돌진 파수꾼",
+      "height": 2.08,
+      "width": 1.3801986901757561,
+      "depth": 0.5448746853966993,
+      "vertices": 2754,
+      "triangles": 5300,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "shield",
+      "name": "방패 망령",
+      "height": 1.92,
+      "width": 1.1925317296980165,
+      "depth": 0.6168864625635594,
+      "vertices": 2870,
+      "triangles": 5552,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "ashpriest",
+      "name": "재의 사제",
+      "height": 1.92,
+      "width": 0.9996371739542156,
+      "depth": 0.5595258492737972,
+      "vertices": 4378,
+      "triangles": 8576,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "watcher",
+      "name": "궤도 감시자",
+      "height": 2.16,
+      "width": 1.0673310318580227,
+      "depth": 0.9334612552120954,
+      "vertices": 1282,
+      "triangles": 2520,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "heartguard",
+      "name": "심장 수호병",
+      "height": 2.24,
+      "width": 1.3089007423989762,
+      "depth": 0.6918533298902318,
+      "vertices": 2628,
+      "triangles": 5056,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "riftshaman",
+      "name": "균열 주술사",
+      "height": 2.0,
+      "width": 1.0076536837123629,
+      "depth": 0.582839426326872,
+      "vertices": 3292,
+      "triangles": 6436,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "voidknight",
+      "name": "공허 기사",
+      "height": 2.32,
+      "width": 1.283094846222455,
+      "depth": 0.6782129562376012,
+      "vertices": 2676,
+      "triangles": 5144,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "sealcaster",
+      "name": "봉인술사",
+      "height": 2.0,
+      "width": 0.9588178061282926,
+      "depth": 0.8165196029161865,
+      "vertices": 3124,
+      "triangles": 6120,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "chainhound",
+      "name": "사슬 사냥개",
+      "height": 1.12,
+      "width": 0.5681158852412002,
+      "depth": 1.866053177704755,
+      "vertices": 4324,
+      "triangles": 8516,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "readerstatue",
+      "name": "독서 석상",
+      "height": 2.4,
+      "width": 0.9830809604617219,
+      "depth": 0.9891212799346234,
+      "vertices": 2404,
+      "triangles": 4644,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "gatekeeper",
+      "name": "문지기",
+      "height": 3.68,
+      "width": 2.472406395447337,
+      "depth": 1.1202799797116914,
+      "vertices": 1946,
+      "triangles": 3712,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "chainpriest",
+      "name": "사슬 사제",
+      "height": 3.36,
+      "width": 1.7302675240597996,
+      "depth": 0.8220605724173056,
+      "vertices": 6660,
+      "triangles": 13132,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    },
+    {
+      "kind": "relicheart",
+      "name": "유물 심장",
+      "height": 3.6,
+      "width": 2.0573526475615775,
+      "depth": 1.8044961978511656,
+      "vertices": 1188,
+      "triangles": 2280,
+      "review_status": "awaiting_user_review",
+      "game_applied": false
+    }
+  ]
+}

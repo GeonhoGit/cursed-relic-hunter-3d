@@ -1,0 +1,169 @@
+{
+  "game_applied": false,
+  "fps": 24,
+  "frames": 96,
+  "arrangement": "four columns, four tiers",
+  "trails": "authored FX sketch geometry; not a change to collision dimensions",
+  "models": [
+    {
+      "kind": "W01",
+      "name": "유물 사수기 탄",
+      "source": "src/core/weapons.ts:W01",
+      "nominal_runtime_body_length_m": 0.16,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 8,
+      "verified_loop": true
+    },
+    {
+      "kind": "W02",
+      "name": "산탄 성물 탄",
+      "source": "src/core/weapons.ts:W02",
+      "nominal_runtime_body_length_m": 0.12,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 6,
+      "verified_loop": true
+    },
+    {
+      "kind": "W03",
+      "name": "관측자의 쇠뇌 화살",
+      "source": "src/core/weapons.ts:W03",
+      "nominal_runtime_body_length_m": 0.85,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 9,
+      "verified_loop": true
+    },
+    {
+      "kind": "W04",
+      "name": "균열 지팡이 마력탄",
+      "source": "src/core/weapons.ts:W04",
+      "nominal_runtime_body_length_m": 0.32,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 6,
+      "verified_loop": true
+    },
+    {
+      "kind": "archer",
+      "name": "궁수의 녹슨 화살",
+      "source": "src/core/enemy-ai.ts:archer",
+      "nominal_runtime_body_length_m": 0.62,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 9,
+      "verified_loop": true
+    },
+    {
+      "kind": "ashpriest",
+      "name": "재의 사제 화염탄",
+      "source": "src/core/enemy-ai.ts:ashpriest",
+      "nominal_runtime_body_length_m": 0.3,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 7,
+      "verified_loop": true
+    },
+    {
+      "kind": "watcher",
+      "name": "감시자 궤도탄",
+      "source": "src/core/enemy-ai.ts:watcher",
+      "nominal_runtime_body_length_m": 0.3,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 10,
+      "verified_loop": true
+    },
+    {
+      "kind": "riftshaman",
+      "name": "주술사 균열 파편",
+      "source": "src/core/enemy-ai.ts:riftshaman",
+      "nominal_runtime_body_length_m": 0.32,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 6,
+      "verified_loop": true
+    },
+    {
+      "kind": "gatekeeper",
+      "name": "문지기 석재탄",
+      "source": "src/core/boss.ts:fan",
+      "nominal_runtime_body_length_m": 0.4,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 8,
+      "verified_loop": true
+    },
+    {
+      "kind": "chainpriest",
+      "name": "사슬 사제 혼불탄",
+      "source": "src/core/priest-boss.ts:bullet",
+      "nominal_runtime_body_length_m": 0.3,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 10,
+      "verified_loop": true
+    },
+    {
+      "kind": "relicheart",
+      "name": "유물 심장 맥동탄",
+      "source": "src/core/heart-boss.ts:bullet",
+      "nominal_runtime_body_length_m": 0.32,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 12,
+      "verified_loop": true
+    },
+    {
+      "kind": "split",
+      "name": "분열 유물 파편탄",
+      "source": "src/core/projectile-effects.ts:splitShot",
+      "nominal_runtime_body_length_m": 0.14,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 9,
+      "verified_loop": true
+    },
+    {
+      "kind": "reflected",
+      "name": "패링 반사탄",
+      "source": "src/core/dodge.ts:parryProjectile",
+      "nominal_runtime_body_length_m": 0.18,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 9,
+      "verified_loop": true
+    },
+    {
+      "kind": "frost",
+      "name": "서리 유물 냉기탄",
+      "source": "src/core/projectile-effects.ts:frostHit",
+      "nominal_runtime_body_length_m": 0.22,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 8,
+      "verified_loop": true
+    },
+    {
+      "kind": "homing",
+      "name": "유도 유물 추적탄",
+      "source": "src/core/homing.ts:guideProjectile",
+      "nominal_runtime_body_length_m": 0.18,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 11,
+      "verified_loop": true
+    },
+    {
+      "kind": "return",
+      "name": "회귀 유물 귀환탄",
+      "source": "src/core/projectile-effects.ts:expireShot",
+      "nominal_runtime_body_length_m": 0.18,
+      "review_display_scale": 1.5,
+      "game_applied": false,
+      "mesh_parts": 8,
+      "verified_loop": true
+    }
+  ]
+}

@@ -24,6 +24,8 @@ const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
 export class CombatHud {
   private mapKey = '';
+  private interactKey = '';
+  private compassSector = -1;
 
   resetMap() { this.mapKey = ''; }
 
@@ -76,13 +78,20 @@ export class CombatHud {
     const chestRoom = currentRoom(s)?.kind === 'treasure' && currentRoom(s)?.reward === null;
     if (chestRoom) $('objective').textContent = '가운데 유물 상자에 다가가 E키로 여세요';
     $('interact').hidden = modal !== '' || (!canOpenTreasure(s) && currentRoom(s)?.kind !== 'shop');
-    $('interact').innerHTML = `<kbd>E</kbd> ${chestRoom ? '유물 상자 열기' : '상인과 거래하기'}`;
+    const interactKey = chestRoom ? 'chest' : 'shop';
+    if (interactKey !== this.interactKey) {
+      this.interactKey = interactKey;
+      $('interact').innerHTML = `<kbd>E</kbd> ${chestRoom ? '유물 상자 열기' : '상인과 거래하기'}`;
+    }
     $('damage-veil').classList.toggle('hurt', !reducedMotion && p.invulnerable > 37 && p.invulnerable <= 45);
     $('crosshair').hidden = !!modal;
     $('capture-hint').hidden = !!modal || mouseCaptured;
     const sectors = ['동쪽', '남동', '남쪽', '남서', '서쪽', '북서', '북쪽', '북동'];
     const sector = (Math.round(yaw / (Math.PI / 4)) + 8) % 8;
-    $('compass').innerHTML = `${['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'][sector]} <span>${sectors[sector]}</span>`;
+    if (sector !== this.compassSector) {
+      this.compassSector = sector;
+      $('compass').innerHTML = `${['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'][sector]} <span>${sectors[sector]}</span>`;
+    }
     $('notice').classList.toggle('visible', performance.now() < noticeUntil);
   }
 }

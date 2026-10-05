@@ -1,0 +1,190 @@
+[
+  {
+    "kind": "heartguard",
+    "before": {
+      "kind": "heartguard",
+      "samples": [
+        {
+          "frame": 135,
+          "edge_alignment": 0.3074245657771826,
+          "flat_face_alignment": 0.9515725076198578
+        },
+        {
+          "frame": 136,
+          "edge_alignment": 0.14834449742920697,
+          "flat_face_alignment": 0.9889357226675202
+        },
+        {
+          "frame": 137,
+          "edge_alignment": 0.5468467324972153,
+          "flat_face_alignment": 0.8372326754033566
+        },
+        {
+          "frame": 138,
+          "edge_alignment": 0.6254596412181854,
+          "flat_face_alignment": 0.7802566215395927
+        },
+        {
+          "frame": 170,
+          "edge_alignment": 0.26327795162796974,
+          "flat_face_alignment": 0.9647200852632523
+        },
+        {
+          "frame": 171,
+          "edge_alignment": 0.4061281904578209,
+          "flat_face_alignment": 0.913816012442112
+        },
+        {
+          "frame": 172,
+          "edge_alignment": 0.6788296848535538,
+          "flat_face_alignment": 0.7342958524823189
+        }
+      ],
+      "minimum_edge_alignment": 0.14834449742920697,
+      "mean_edge_alignment": 0.4251873234087335,
+      "maximum_flat_face_alignment": 0.9889357226675202
+    },
+    "after": {
+      "kind": "heartguard",
+      "samples": [
+        {
+          "frame": 135,
+          "edge_alignment": 1.0,
+          "flat_face_alignment": 0.0
+        },
+        {
+          "frame": 136,
+          "edge_alignment": 1.0000000523286872,
+          "flat_face_alignment": 1.0368239600211382e-08
+        },
+        {
+          "frame": 137,
+          "edge_alignment": 0.9999998635612428,
+          "flat_face_alignment": 1.2665987014770508e-07
+        },
+        {
+          "frame": 138,
+          "edge_alignment": 1.0000000149011612,
+          "flat_face_alignment": 1.862645149230957e-07
+        },
+        {
+          "frame": 170,
+          "edge_alignment": 1.0000000894069672,
+          "flat_face_alignment": 4.470348358154297e-08
+        },
+        {
+          "frame": 171,
+          "edge_alignment": 1.0000000447034836,
+          "flat_face_alignment": 2.1350570023059845e-07
+        },
+        {
+          "frame": 172,
+          "edge_alignment": 1.0000000596046448,
+          "flat_face_alignment": 3.5390257835388184e-08
+        }
+      ],
+      "minimum_edge_alignment": 0.9999998635612428,
+      "mean_edge_alignment": 1.0000000177865982,
+      "maximum_flat_face_alignment": 2.1350570023059845e-07
+    }
+  },
+  {
+    "kind": "voidknight",
+    "before": {
+      "kind": "voidknight",
+      "samples": [
+        {
+          "frame": 148,
+          "edge_alignment": 0.3939870670437813,
+          "flat_face_alignment": 0.9191160276532173
+        },
+        {
+          "frame": 149,
+          "edge_alignment": 0.32834915816783905,
+          "flat_face_alignment": 0.9445563554763794
+        },
+        {
+          "frame": 150,
+          "edge_alignment": 0.1432301588356495,
+          "flat_face_alignment": 0.9896894842386246
+        },
+        {
+          "frame": 151,
+          "edge_alignment": 0.1403400106355548,
+          "flat_face_alignment": 0.9901034459471703
+        },
+        {
+          "frame": 152,
+          "edge_alignment": 0.400026086717844,
+          "flat_face_alignment": 0.9165036901831627
+        },
+        {
+          "frame": 153,
+          "edge_alignment": 0.5519353747367859,
+          "flat_face_alignment": 0.8338869139552116
+        },
+        {
+          "frame": 154,
+          "edge_alignment": 0.6156748384237289,
+          "flat_face_alignment": 0.7880002856254578
+        },
+        {
+          "frame": 155,
+          "edge_alignment": 0.632225438952446,
+          "flat_face_alignment": 0.7747843340039253
+        }
+      ],
+      "minimum_edge_alignment": 0.1403400106355548,
+      "mean_edge_alignment": 0.4007210166892037,
+      "maximum_flat_face_alignment": 0.9901034459471703
+    },
+    "after": {
+      "kind": "voidknight",
+      "samples": [
+        {
+          "frame": 148,
+          "edge_alignment": 1.0000000782310963,
+          "flat_face_alignment": 2.086162567138672e-07
+        },
+        {
+          "frame": 149,
+          "edge_alignment": 1.0000000447034836,
+          "flat_face_alignment": 2.086162567138672e-07
+        },
+        {
+          "frame": 150,
+          "edge_alignment": 1.0000000447034836,
+          "flat_face_alignment": 8.568167686462402e-08
+        },
+        {
+          "frame": 151,
+          "edge_alignment": 0.999999943189323,
+          "flat_face_alignment": 5.774199962615967e-08
+        },
+        {
+          "frame": 152,
+          "edge_alignment": 0.9999999850988388,
+          "flat_face_alignment": 1.2246891856193542e-07
+        },
+        {
+          "frame": 153,
+          "edge_alignment": 0.9999999552965164,
+          "flat_face_alignment": 1.6391277313232422e-07
+        },
+        {
+          "frame": 154,
+          "edge_alignment": 0.9999999329447746,
+          "flat_face_alignment": 1.7881393432617188e-07
+        },
+        {
+          "frame": 155,
+          "edge_alignment": 0.999999925494194,
+          "flat_face_alignment": 2.5331974029541016e-07
+        }
+      ],
+      "minimum_edge_alignment": 0.999999925494194,
+      "mean_edge_alignment": 0.9999999887077138,
+      "maximum_flat_face_alignment": 2.5331974029541016e-07
+    }
+  }
+]

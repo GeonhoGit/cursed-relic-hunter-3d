@@ -14,14 +14,16 @@ import { statueLaserEnd } from '../core/reader-statue';
 import { stoneMaterial } from './ruins-materials';
 import { wallGeometry } from './wall-geometry';
 import type { MotionFrame } from './render-motion';
+import type { GraphicsLevel } from '../core/render-timing';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { SCALE, wx, wz } from './world-space';
-import { bevel, box, dispose, label, material, orb, ring } from './scene-primitives';
+import { bevel, box, dispose, label, material, orb, ring, spikeField } from './scene-primitives';
 import { figure } from './enemy-models';
 
 export { SCALE } from './world-space';
@@ -36,11 +38,17 @@ const ATMOSPHERE = [
 export class World {
   readonly renderer: THREE.WebGLRenderer;
   readonly camera = new THREE.PerspectiveCamera(78, 1, 0.04, 75);
+  private weaponScene = new THREE.Scene();
+  private weaponCamera = new THREE.PerspectiveCamera(78, 1, 0.04, 75);
   private scene = new THREE.Scene(); private room = new THREE.Group(); private entities = new Map<string, THREE.Group>();
   private roomKey = ''; private doors: THREE.Mesh[] = []; private relic?: THREE.Mesh; private chestLid?: THREE.Group;
   private gun = new THREE.Group(); private muzzle!: THREE.Mesh; private light: THREE.PointLight;
-  private crossbow = new THREE.Group(); private bolt!: THREE.Mesh;
-  private staff = new THREE.Group(); private staffFlash!: THREE.Mesh;
+  private weaponViews: Record<'W01' | 'W02' | 'W03' | 'W04', THREE.Group> = {
+    W01: new THREE.Group(), W02: new THREE.Group(), W03: new THREE.Group(), W04: new THREE.Group(),
+  };
+  private weaponLoader = new GLTFLoader();
+  private weaponLoads = new Map<keyof typeof this.weaponViews, { loading: boolean; loaded: boolean; attempts: number; retryAt: number }>();
+  private bolt: THREE.Object3D = new THREE.Group(); private staffFlash!: THREE.Mesh;
   private worldReady = true;
   private composer: EffectComposer;
   private bloom: UnrealBloomPass;
@@ -49,6 +57,7 @@ export class World {
   private ambient = new THREE.HemisphereLight(0xb6d1ca, 0x353628, .95);
   private keyLight = new THREE.DirectionalLight(0xffe2ba, 1.7);
   private reflectionTarget?: THREE.WebGLRenderTarget;
+  private graphicsLevel: GraphicsLevel = 3;
   get ready() { return this.worldReady; }
   constructor(host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -58,7 +67,11 @@ export class World {
     this.renderer.domElement.setAttribute('aria-label', '3D 1인칭 유적 탐험 화면'); host.append(this.renderer.domElement);
     this.scene.background = new THREE.Color(0x0e191b); this.scene.fog = new THREE.FogExp2(0x0e191b, 0.017);
     this.scene.add(this.room, this.camera, this.ambient);
+    const weaponLight = new THREE.DirectionalLight(0xffe2ba, 1.7);
+    weaponLight.position.set(-4, 10, 3);
+    this.weaponScene.add(this.weaponCamera, new THREE.HemisphereLight(0xb6d1ca, 0x353628, .95), weaponLight);
     this.buildReflections(); this.scene.environmentIntensity = .16;
+    this.weaponScene.environmentIntensity = .16;
     const sun = this.keyLight; sun.position.set(-4, 10, 3); sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -22; sun.shadow.camera.right = 22;
     sun.shadow.camera.top = 13; sun.shadow.camera.bottom = -13; sun.shadow.normalBias = 0.025; sun.shadow.bias = -0.00015;
@@ -66,67 +79,91 @@ export class World {
     this.scene.add(sun);
     this.light = new THREE.PointLight(0x91d6ca, 3.5, 9, 2); this.scene.add(this.light);
     this.composer = new EffectComposer(this.renderer); this.composer.addPass(new RenderPass(this.scene, this.camera));
+    // Clear world depth while preserving its color; weapon parts still occlude each other.
+    const weaponPass = new RenderPass(this.weaponScene, this.weaponCamera);
+    weaponPass.clear = false; weaponPass.clearDepth = true;
+    this.composer.addPass(weaponPass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.22, 0.4, 1.4); this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
-    this.camera.add(this.gun); this.gun.position.set(0.28, -0.23, -0.6); this.gun.scale.setScalar(0.7);
-    bevel(this.gun, 0.2, 0.18, 0.45, 0, 0, -0.06, 0x344c4c, true);
-    bevel(this.gun, 0.11, 0.3, 0.15, 0, -0.18, 0.05, 0x725e43);
-    bevel(this.gun, 0.23, 0.025, 0.4, 0, 0.1, -0.08, 0xc2b485, true);
-    orb(this.gun, 0.055, 0, 0.03, 0.15, 0x85d2bd, 0x247c66);
-    bevel(this.gun, 0.12, 0.11, 0.32, 0, 0.01, -0.4, 0x9a9b7d, true);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, .24, 16), material(0x526767));
-    barrel.material.metalness = .85; barrel.material.roughness = .28;
-    barrel.rotation.x = Math.PI / 2; barrel.position.set(0, .01, -.48); this.gun.add(barrel);
-    const muzzleRim = new THREE.Mesh(new THREE.TorusGeometry(.052, .013, 8, 24), material(0xc7aa79));
-    muzzleRim.material.metalness = .8; muzzleRim.position.set(0, .01, -.605); this.gun.add(muzzleRim);
-    const bore = new THREE.Mesh(new THREE.CircleGeometry(.044, 16), new THREE.MeshBasicMaterial({ color: 0x101a1b, side: THREE.DoubleSide }));
-    bore.position.set(0, .01, -.604); this.gun.add(bore);
-    const trigger = new THREE.Mesh(new THREE.TorusGeometry(.075, .012, 6, 18, Math.PI * 1.5), material(0xa68d67));
-    trigger.rotation.y = Math.PI / 2; trigger.position.set(.005, -.115, -.045); this.gun.add(trigger);
-    for (let i = 0; i < 5; i++) bevel(this.gun, 0.24, 0.035, 0.03, 0, 0.11, -0.21 + i * 0.07, 0x59665e, true);
-    for (const sign of [-1, 1]) {
-      bevel(this.gun, 0.015, 0.015, 0.34, sign * 0.11, 0.02, -0.08, 0xd2b788, true);
-      orb(this.gun, 0.018, sign * 0.105, -0.025, 0.07, 0xd1bd8b);
+    this.weaponCamera.add(this.gun); this.gun.position.set(0.32, -0.25, -0.64); this.gun.scale.setScalar(0.6);
+    this.gun.rotation.y = .12;
+    for (const id of ['W01', 'W02', 'W03', 'W04'] as const) {
+      const view = this.weaponViews[id]; view.name = `weapon-${id}`; this.gun.add(view);
+      if (id === 'W04') { view.position.set(.13, -.28, 0); view.rotation.x = -.17; }
     }
-    bevel(this.gun, 0.16, 0.22, 0.19, 0.02, -0.22, 0.06, 0x31453e);
-    bevel(this.gun, 0.18, 0.2, 0.4, 0.04, -0.38, 0.2, 0x6b7060);
-    this.muzzle = orb(this.gun, 0.11, 0, 0.01, -0.58, 0xcaffd5, 0xaaff9f); this.muzzle.visible = false;
-    this.crossbow.name = 'observer-crossbow'; this.gun.add(this.crossbow);
-    bevel(this.crossbow,0.16,0.14,0.86,0,0,-0.12,0x765a3f);
-    bevel(this.crossbow,0.08,0.035,0.8,0,0.085,-0.13,0xc5b591,true);
-    bevel(this.crossbow,0.12,0.28,0.16,0,-0.18,0.13,0x3d5554,true);
-    for(const sign of [-1,1]) {
-      const limb=bevel(this.crossbow,0.58,0.07,0.08,sign*0.29,0.045,-0.43,0x6a8587,true);
-      limb.rotation.y=-sign*0.22;
-      const string=box(this.crossbow,0.57,0.009,0.009,sign*0.27,0.07,-0.26,0xe1d4ac);
-      string.rotation.y=sign*0.43;
-      orb(this.crossbow,0.04,sign*0.57,0.045,-0.36,0xb6d6da,0x3e8e94);
+    this.muzzle = orb(this.gun, .12, 0, .04, -.91, 0xcaffd5, 0xaaff9f); this.muzzle.visible = false;
+    this.staffFlash = orb(this.gun, .22, .09, .46, -.18, 0xeddcff, 0x8961bd); this.staffFlash.visible = false;
+    for (const flash of [this.muzzle, this.staffFlash]) {
+      flash.renderOrder = 1001; flash.castShadow = false;
+      const surfaces: THREE.Material[] = Array.isArray(flash.material) ? flash.material : [flash.material];
+      for (const surface of surfaces) {
+        surface.depthTest = false; surface.depthWrite = false;
+      }
     }
-    this.bolt=bevel(this.crossbow,0.025,0.025,0.63,0,0.115,-0.17,0xd0b992,true);
-    const tip=new THREE.Mesh(new THREE.ConeGeometry(0.04,0.13,4),material(0xa4e6e1,0x337d79));
-    tip.rotation.x=-Math.PI/2;tip.position.set(0,0,-0.37);this.bolt.add(tip);
-    this.staff.name = 'rift-staff-weapon'; this.staff.rotation.x = -.35; this.gun.add(this.staff);
-    bevel(this.staff, .065, .92, .065, 0, -.21, 0, 0x59435f, true);
-    for (let i = 0; i < 5; i++) bevel(this.staff, .087, .018, .087, 0, -.08 - i * .075, 0, 0xb3a086, true);
-    bevel(this.staff, .16, .14, .16, 0, .22, 0, 0x79718a, true);
-    const crystal = orb(this.staff, .14, 0, .42, 0, 0xcdabf5, 0x623788); crystal.scale.set(.8, 1.45, .8);
-    crystal.name = 'rift-crystal';
-    for (const sign of [-1, 1]) {
-      const prong = bevel(this.staff, .045, .36, .045, sign * .15, .39, 0, 0xb2a1ca, true);
-      prong.rotation.z = sign * -.22;
-    }
-    const orbit = new THREE.Mesh(new THREE.TorusGeometry(.2, .018, 8, 32), material(0xcab0dd));
-    orbit.name = 'rift-focus-ring'; orbit.position.y = .4; orbit.rotation.x = Math.PI / 2; this.staff.add(orbit);
-    bevel(this.staff, .17, .2, .18, 0, -.24, .04, 0x687064);
-    this.staffFlash = orb(this.staff, .2, 0, .42, 0, 0xeddcff, 0x8961bd); this.staffFlash.visible = false;
-    this.gun.traverse(o => { if (o instanceof THREE.Mesh) { o.renderOrder = 1000; o.material.depthTest = false; o.castShadow = false; } });
     new ResizeObserver(() => {
       const { width, height } = host.getBoundingClientRect(); if (!width || !height) return;
       this.renderer.setSize(width, height); this.composer.setSize(width, height);
       this.camera.aspect = width / height; this.camera.updateProjectionMatrix();
+      this.weaponCamera.aspect = width / height; this.weaponCamera.updateProjectionMatrix();
     }).observe(host);
     this.renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); this.worldReady = false; });
     this.renderer.domElement.addEventListener('webglcontextrestored', () => { this.buildReflections(); this.worldReady = true; this.roomKey = ''; });
+  }
+  private loadWeapon(id: keyof typeof this.weaponViews) {
+    const view = this.weaponViews[id];
+    let state = this.weaponLoads.get(id);
+    if (!state) {
+      state = { loading: false, loaded: false, attempts: 0, retryAt: 0 };
+      this.weaponLoads.set(id, state);
+      const fallback = new THREE.Group(); fallback.name = 'weapon-fallback';
+      const part = (w: number, h: number, d: number, x: number, y: number, z: number, color: number) => {
+        const mesh = box(fallback, w, h, d, x, y, z, color);
+        mesh.castShadow = mesh.receiveShadow = false;
+        return mesh;
+      };
+      if (id === 'W04') {
+        part(.07, .9, .07, 0, .18, 0, 0x6d537f);
+        part(.18, .18, .18, 0, .7, 0, 0xc9a7e5);
+      } else {
+        part(id === 'W02' ? .23 : .14, .14, id === 'W01' ? .6 : .85, 0, .08, -.35, 0x647c78);
+        const grip = part(.12, .28, .13, 0, -.1, -.02, 0x463e35); grip.rotation.x = -.2;
+        if (id === 'W03') part(.75, .07, .09, 0, .08, -.56, 0x9e8f69);
+      }
+      view.add(fallback);
+    }
+    // Paint drives retries only when this weapon is in use; no background timers or per-frame requests.
+    if (state.loading || state.loaded || state.attempts >= 3 || performance.now() < state.retryAt) return;
+    const request = state;
+    request.loading = true; request.attempts++;
+    this.weaponLoader.load(`${import.meta.env.BASE_URL}models/weapons/${id.toLowerCase()}.glb`, asset => {
+      const fallback = view.getObjectByName('weapon-fallback');
+      if (fallback) { view.remove(fallback); dispose(fallback); }
+      asset.scene.name = 'weapon-model';
+      view.add(asset.scene);
+      asset.scene.traverse(object => {
+        if (!(object instanceof THREE.Mesh)) return;
+        object.castShadow = false;
+        const surfaces: THREE.Material[] = Array.isArray(object.material) ? object.material : [object.material];
+        for (const surface of surfaces) {
+          surface.depthTest = true; surface.depthWrite = true;
+        }
+      });
+      if (id === 'W03') this.bolt = asset.scene.getObjectByName('loaded_bolt') ?? this.bolt;
+      request.loading = false; request.loaded = true;
+    }, undefined, error => {
+      request.loading = false;
+      request.retryAt = performance.now() + 1000 * 2 ** (request.attempts - 1);
+      console.warn(`Could not load ${id} weapon model (attempt ${request.attempts}/3); using fallback`, error);
+    });
+  }
+  setQuality(level: GraphicsLevel) {
+    if (this.graphicsLevel === level) return;
+    this.graphicsLevel = level;
+    const ratio = level === 0 ? 0.6 : level === 1 ? 0.8 : level === 2 ? 1 : Math.min(devicePixelRatio, 2);
+    this.renderer.setPixelRatio(ratio);
+    this.composer.setPixelRatio(ratio);
+    this.renderer.shadowMap.enabled = level === 3;
+    this.keyLight.castShadow = level === 3;
   }
   private buildReflections() {
     const environment = new RoomEnvironment(), pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -134,6 +171,7 @@ export class World {
     // Reuse the same map through room travel; restore its rendered pixels after context loss.
     this.reflectionTarget = pmrem.fromScene(environment, .06);
     this.scene.environment = this.reflectionTarget.texture;
+    this.weaponScene.environment = this.reflectionTarget.texture;
     environment.dispose(); pmrem.dispose();
   }
   private buildRoom(s: RunState) {
@@ -332,17 +370,20 @@ export class World {
     if (key !== this.roomKey) { this.roomKey = key; this.buildRoom(s); }
     const reduced = !!visual.reducedMotion, p = s.player, pose = visual.motion?.player ?? p;
     const bob = !reduced && !paused && moving && !p.dodgeRemaining && !(p.height ?? 0) ? Math.sin(s.tick * 0.13) * 0.018 : 0;
-    this.bloom.enabled = !reduced;
+    this.bloom.enabled = !reduced && this.graphicsLevel === 3;
     this.camera.position.set(wx(pose.x), playerEyeHeight({ ...p, height: pose.height }) * SCALE + bob, wz(pose.y));
     this.camera.lookAt(this.camera.position.x + Math.cos(yaw) * Math.cos(pitch), this.camera.position.y + Math.sin(pitch), this.camera.position.z + Math.sin(yaw) * Math.cos(pitch));
     this.light.position.copy(this.camera.position); this.light.position.y += 0.5;
-    this.gun.visible = !paused; this.gun.position.y = -0.23 + bob * 0.4;
+    this.light.visible = this.graphicsLevel >= 2;
+    this.gun.visible = !paused; this.gun.position.y = -0.25 + bob * 0.4;
     const recoil = reduced ? 0 : Math.min(1, Math.max(0, p.fireCooldown - (attackStats(s).fireInterval - 6)) / 6);
-    this.gun.position.z = -0.6 + recoil * 0.035; this.gun.rotation.x = recoil * 0.05;
-    this.gun.scale.x = s.weapon === 'W02' ? 0.98 : 0.7;
-    for(const part of this.gun.children) part.visible = part === this.staff ? s.weapon === 'W04' : part === this.crossbow ? s.weapon === 'W03' : s.weapon !== 'W03' && s.weapon !== 'W04';
+    this.gun.position.z = -0.64 + recoil * 0.035; this.gun.rotation.x = recoil * 0.05;
+    const weapon = s.weapon ?? 'W01';
+    this.loadWeapon(weapon);
+    for (const [id, view] of Object.entries(this.weaponViews)) view.visible = weapon === id;
     this.bolt.visible=p.fireCooldown<=12;
     const fired = !reduced && s.cues.some(c => c.kind === 'shot' && s.tick - c.tick <= 2);
+    this.muzzle.position.z = s.weapon === 'W03' ? -.75 : -.91;
     this.muzzle.visible = s.weapon !== 'W04' && fired;
     this.staffFlash.visible = s.weapon === 'W04' && fired;
     for (const door of this.doors) door.visible = s.phase !== 'explore';
@@ -351,8 +392,11 @@ export class World {
     if (this.relic) { this.relic.visible = this.chestLid ? !!reward && reward.choice === null : reward?.choice == null; this.relic.rotation.y = s.tick * 0.015; this.relic.position.y = 1.7 + Math.sin(s.tick * 0.025) * 0.08; }
     const present = new Set<string>();
     this.flames.forEach((flame, i) => { flame.scale.y = reduced ? 1.8 : 1.8 + Math.sin(s.tick * 0.19 + i * 3) * 0.35; });
-    this.torchLights.forEach((light, i) => { light.intensity = reduced ? 31 : 31 * (1 + Math.sin(s.tick * .11 + i * 2.7) * .045 + Math.sin(s.tick * .23 + i) * .025); });
-    if (this.dust) { this.dust.visible = !reduced; this.dust.position.y = Math.sin(s.tick * 0.003) * 0.06; }
+    this.torchLights.forEach((light, i) => {
+      light.visible = i < (this.graphicsLevel === 0 ? 0 : this.graphicsLevel === 1 ? 1 : this.graphicsLevel === 2 ? 2 : 4);
+      light.intensity = reduced ? 31 : 31 * (1 + Math.sin(s.tick * .11 + i * 2.7) * .045 + Math.sin(s.tick * .23 + i) * .025);
+    });
+    if (this.dust) { this.dust.visible = !reduced && this.graphicsLevel >= 2; this.dust.position.y = Math.sin(s.tick * 0.003) * 0.06; }
     for (const e of [...s.enemies, ...(s.boss && s.boss.hp > 0 ? [s.boss] : [])]) {
       const g = this.object(`enemy-${e.id}`, () => figure(e.kind), present);
       const pose = visual.motion?.enemies.get(e.id) ?? e;
@@ -445,10 +489,7 @@ export class World {
         if(s.expedition?.region===3) {
           box(g,b.w*SCALE,stage==='active'?.64:.01,b.h*SCALE,0,stage==='active'?.32:.045,0,color,stage==='active'?0x913341:stage==='warning'?0x675628:0);return g;
         }
-        for(let x=-b.w*SCALE/2+0.16;x<b.w*SCALE/2;x+=0.34) for(let z=-b.h*SCALE/2+0.16;z<b.h*SCALE/2;z+=0.34) {
-          const spike=new THREE.Mesh(new THREE.ConeGeometry(0.075,stage==='active'?0.48:0.06,5),material(color));
-          spike.position.set(x,stage==='active'?0.24:0.05,z); g.add(spike);
-        }
+        g.add(spikeField(b.w * SCALE, b.h * SCALE, stage === 'active' ? 0.48 : 0.06, color, stage === 'active' ? 0.24 : 0.05));
         if(stage!=='rest') box(g,b.w*SCALE,0.006,b.h*SCALE,0,0.045,0,color,stage==='active'?0x9d3015:0x665220);
         return g;
       },present);
@@ -484,7 +525,15 @@ export class World {
       g.position.set(wx(c.x), 0.55 + age * 0.45, wz(c.y)); g.scale.setScalar(1 + age * (c.kind === 'blast' ? 10 : 2));
     }
     for (const [key, g] of this.entities) if (!present.has(key)) { this.scene.remove(g); dispose(g); this.entities.delete(key); }
-    this.composer.render();
+    if (this.bloom.enabled) this.composer.render();
+    else {
+      this.renderer.render(this.scene, this.camera);
+      const autoClear = this.renderer.autoClear;
+      this.renderer.autoClear = false;
+      this.renderer.clearDepth();
+      this.renderer.render(this.weaponScene, this.weaponCamera);
+      this.renderer.autoClear = autoClear;
+    }
   }
   private paintHeart(s:RunState,e:Boss,g:THREE.Group,present:Set<string>) {
     const core=g.getObjectByName('heart-core')!;core.scale.set(.82,1.6+Math.sin(s.tick*.08)*.08,.82);

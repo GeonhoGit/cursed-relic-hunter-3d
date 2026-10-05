@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 type StoneStyle = 'floor' | 'wall';
 const surfaces = new Map<string, { color: HTMLCanvasElement; roughness: HTMLCanvasElement; occlusion: HTMLCanvasElement; normal: Uint8Array }>();
-const SIZE = 512;
+const SIZE = 256;
 
 // Deterministic albedo, roughness and tangent-space normals; no remote assets needed.
 function surface(color: number, style: StoneStyle) {

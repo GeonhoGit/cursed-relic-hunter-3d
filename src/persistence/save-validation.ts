@@ -1,5 +1,6 @@
 import { JUMP, STOMP } from '../core/jump';
 import { validMouseSensitivity } from '../core/settings';
+import { validGraphicsMode } from '../core/render-timing';
 import { BOUNDS, unreflectableBullet, type Boss, type Bullet, type DungeonRoom, type Enemy, type Frost, type RelicId, type RunState } from '../core/model';
 import { HEART } from '../core/heart-boss';
 import { hasRelic, isCurse, RELIC_IDS } from '../core/relics';
@@ -344,5 +345,6 @@ export function validRecord(value: unknown): value is SaveRecord {
     && (!r.run?.growth?.firstRoomCleared || !!r.profile?.rooms.length)
     && !!r.settings && [0, 30, 60, 120, 144].includes(r.settings.fps)
     && ['sound', 'reducedMotion', 'showFps'].every(k => typeof r.settings[k as keyof Settings] === 'boolean')
-    && (r.settings.mouseSensitivity === undefined || validMouseSensitivity(r.settings.mouseSensitivity));
+    && (r.settings.mouseSensitivity === undefined || validMouseSensitivity(r.settings.mouseSensitivity))
+    && (r.settings.graphicsQuality === undefined || validGraphicsMode(r.settings.graphicsQuality));
 }

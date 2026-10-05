@@ -1,4 +1,5 @@
 import { validMouseSensitivity } from '../core/settings';
+import { validGraphicsMode } from '../core/render-timing';
 import type { Investment, RunState, WeaponId } from '../core/model';
 import { defaultProfile, earnedPoints, investedPoints, recordGrowth, validProfile } from '../core/growth';
 import { weaponUnlocked } from '../core/weapons';
@@ -54,6 +55,7 @@ export class SaveStore {
       if (this.blocked) throw new CorruptSaveError();
       if (copy.run && !validRun(copy.run)) throw new CorruptSaveError();
       if (copy.settings.mouseSensitivity !== undefined && !validMouseSensitivity(copy.settings.mouseSensitivity)) throw new CorruptSaveError();
+      if (copy.settings.graphicsQuality !== undefined && !validGraphicsMode(copy.settings.graphicsQuality)) throw new CorruptSaveError();
       const db = await this.db();
       return new Promise<SaveRecord>((resolve, reject) => {
         const tx = db.transaction('save', 'readwrite'), objectStore = tx.objectStore('save');

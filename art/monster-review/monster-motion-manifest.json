@@ -1,0 +1,106 @@
+{
+  "game_applied": false,
+  "fps": 24,
+  "frames": 120,
+  "idle_frames": [
+    1,
+    24
+  ],
+  "walk_frames": [
+    25,
+    120
+  ],
+  "arrangement": "five columns, three supported tiers",
+  "models": [
+    {
+      "kind": "rat",
+      "animated_joints": 6,
+      "cloth_channels": 0,
+      "sample_max_vertex_displacement": 0.08210479831961055
+    },
+    {
+      "kind": "archer",
+      "animated_joints": 4,
+      "cloth_channels": 4,
+      "sample_max_vertex_displacement": 0.065471157713664
+    },
+    {
+      "kind": "guard",
+      "animated_joints": 6,
+      "cloth_channels": 0,
+      "sample_max_vertex_displacement": 0.2831079317907188
+    },
+    {
+      "kind": "shield",
+      "animated_joints": 6,
+      "cloth_channels": 0,
+      "sample_max_vertex_displacement": 0.256867910228957
+    },
+    {
+      "kind": "ashpriest",
+      "animated_joints": 4,
+      "cloth_channels": 4,
+      "sample_max_vertex_displacement": 0.05582225630235187
+    },
+    {
+      "kind": "watcher",
+      "animated_joints": 4,
+      "cloth_channels": 0,
+      "sample_max_vertex_displacement": 0.8774263934462857
+    },
+    {
+      "kind": "heartguard",
+      "animated_joints": 6,
+      "cloth_channels": 2,
+      "sample_max_vertex_displacement": 0.3096807410570975
+    },
+    {
+      "kind": "riftshaman",
+      "animated_joints": 4,
+      "cloth_channels": 4,
+      "sample_max_vertex_displacement": 0.05814833080166118
+    },
+    {
+      "kind": "voidknight",
+      "animated_joints": 6,
+      "cloth_channels": 2,
+      "sample_max_vertex_displacement": 0.3035750520407727
+    },
+    {
+      "kind": "sealcaster",
+      "animated_joints": 4,
+      "cloth_channels": 4,
+      "sample_max_vertex_displacement": 0.0607133683590461
+    },
+    {
+      "kind": "chainhound",
+      "animated_joints": 7,
+      "cloth_channels": 0,
+      "sample_max_vertex_displacement": 0.14257949278177376
+    },
+    {
+      "kind": "readerstatue",
+      "animated_joints": 2,
+      "cloth_channels": 0,
+      "sample_max_vertex_displacement": 0.0633648036983944
+    },
+    {
+      "kind": "gatekeeper",
+      "animated_joints": 6,
+      "cloth_channels": 0,
+      "sample_max_vertex_displacement": 0.3901162016800655
+    },
+    {
+      "kind": "chainpriest",
+      "animated_joints": 4,
+      "cloth_channels": 6,
+      "sample_max_vertex_displacement": 0.26399695216665686
+    },
+    {
+      "kind": "relicheart",
+      "animated_joints": 5,
+      "cloth_channels": 0,
+      "sample_max_vertex_displacement": 1.7773970668466212
+    }
+  ]
+}
