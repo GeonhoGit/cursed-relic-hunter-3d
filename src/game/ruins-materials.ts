@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 type StoneStyle = 'floor' | 'wall';
 const surfaces = new Map<string, { color: HTMLCanvasElement; roughness: HTMLCanvasElement; occlusion: HTMLCanvasElement; normal: Uint8Array }>();
+const textureSources=new Map<string,{map:THREE.CanvasTexture;roughnessMap:THREE.CanvasTexture;aoMap:THREE.CanvasTexture;normalMap:THREE.DataTexture}>();
 const SIZE = 256;
 
 // Deterministic albedo, roughness and tangent-space normals; no remote assets needed.
@@ -55,11 +56,17 @@ function surface(color: number, style: StoneStyle) {
 }
 
 export function stoneMaterial(color: number, style: StoneStyle, repeatX = 1, repeatY = 1) {
-  const source = surface(color, style);
-  const map = new THREE.CanvasTexture(source.color), roughnessMap = new THREE.CanvasTexture(source.roughness);
-  const aoMap = new THREE.CanvasTexture(source.occlusion);
-  const normalMap = new THREE.DataTexture(source.normal, SIZE, SIZE, THREE.RGBAFormat); normalMap.needsUpdate = true;
-  map.colorSpace = THREE.SRGBColorSpace;
+  const key=`${color}:${style}`;let base=textureSources.get(key);
+  if(!base){
+    const source=surface(color,style);
+    base={map:new THREE.CanvasTexture(source.color),roughnessMap:new THREE.CanvasTexture(source.roughness),aoMap:new THREE.CanvasTexture(source.occlusion),normalMap:new THREE.DataTexture(source.normal,SIZE,SIZE,THREE.RGBAFormat)};
+    base.map.colorSpace=THREE.SRGBColorSpace;textureSources.set(key,base);
+  }
+  // Initialize new instances before sharing their unchanged pixels; clone() marks shared sources dirty.
+  const map=new THREE.CanvasTexture(base.map.image),roughnessMap=new THREE.CanvasTexture(base.roughnessMap.image),aoMap=new THREE.CanvasTexture(base.aoMap.image),normalMap=new THREE.DataTexture();
+  normalMap.needsUpdate=true;
+  map.source=base.map.source;roughnessMap.source=base.roughnessMap.source;aoMap.source=base.aoMap.source;normalMap.source=base.normalMap.source;
+  map.colorSpace=THREE.SRGBColorSpace;
   for (const t of [map, roughnessMap, normalMap, aoMap]) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeatX, repeatY);
     t.anisotropy = 4; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
