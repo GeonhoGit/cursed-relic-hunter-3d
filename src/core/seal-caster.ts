@@ -2,6 +2,7 @@ import type { Enemy, RunState } from './model';
 import { ENEMY_ATTACK } from './enemy-balance';
 import { distance, visible } from './geometry';
 import { roomLayout } from './room-layout';
+import { blastStoneWall } from './masonry';
 
 export function cancelSealBlast(e: Enemy) {
   e.mode = 'recover'; e.timer = ENEMY_ATTACK.sealcaster.cooldownTicks;
@@ -14,10 +15,11 @@ export function advanceSealCaster(s: RunState, e: Enemy): { move: boolean; hits:
   if (e.mode === 'windup') {
     if (--e.timer <= 0) {
       const point = { x: e.targetX, y: e.targetY };
-      s.cues.push({ id: s.nextId++, kind: 'blast', ...point, tick: s.tick, amount: attack.radius });
+      s.cues.push({ id: s.nextId++, kind: 'blast', ...point, tick: s.tick, amount: attack.radius, ...(e.charm ? { ally: true as const } : {}) });
       if (distance(point, p) <= attack.radius && (p.height ?? 0) <= attack.blastHeight && visible(point, p, 0, layout.walls))
         hits.push({ damage: attack.damage, cause: '봉인술사의 봉인 폭발', slow: true });
       cancelSealBlast(e);
+      if (!e.charm) blastStoneWall(s, point, attack.radius, attack.damage);
     }
     return idle;
   }

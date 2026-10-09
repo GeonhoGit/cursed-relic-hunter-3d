@@ -2,14 +2,22 @@ import { currentRoom } from '../core/dungeon';
 import { canOpenTreasure, roomInfo } from '../core/expedition';
 import { hasRelic, RELICS } from '../core/relics';
 import { dodgeCharges, maxDodgeCharges } from '../core/dodge';
-import { activeAuxiliary } from '../core/auxiliary';
+import { activeAuxiliary,auxiliaryCooldown,auxiliaryDuration } from '../core/auxiliary';
+import { lockedDoorNearby } from '../core/terrain';
 import { BOMB } from '../core/bombs';
 import { TIME } from '../core/time-debt';
+import { MASONRY } from '../core/masonry';
+import { isAlly, PUPPET } from '../core/allegiance';
+import { SCARECROW } from '../core/scarecrow';
+import { ANCHOR } from '../core/anchor';
+import { featherAvailable } from '../core/evacuation';
+import { ENEMY_NAMES } from '../core/enemy-balance';
 import { attackStats } from '../core/attack-relics';
 import { playerDamage } from '../core/player-effects';
 import { WEAPONS } from '../core/weapons';
 import { regionName } from '../core/region';
 import type { RunState } from '../core/model';
+import { DEFAULT_BINDINGS,bindingLabel,type KeyBindings } from '../core/keybindings';
 import { dungeonMapMarkup } from './dungeon-view';
 
 export interface HudContext {
@@ -18,6 +26,7 @@ export interface HudContext {
   reducedMotion: boolean;
   mouseCaptured: boolean;
   noticeUntil: number;
+  bindings?:KeyBindings;
 }
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -29,7 +38,7 @@ export class CombatHud {
 
   resetMap() { this.mapKey = ''; }
 
-  update(s: RunState, { modal, yaw, reducedMotion, mouseCaptured, noticeUntil }: HudContext) {
+  update(s: RunState, { modal, yaw, reducedMotion, mouseCaptured, noticeUntil,bindings=DEFAULT_BINDINGS }: HudContext) {
     $('region-name').textContent=`${s.expedition?.region??1} / ${regionName(s)}`;
     const info = roomInfo(s), stats = attackStats(s), p = s.player;
     $('room-name').textContent = info.name;
@@ -41,9 +50,32 @@ export class CombatHud {
     $('gold').textContent = String(s.gold); $('kills').textContent = `${s.stats.kills} 처치`;
     $('dodge').textContent = `${dodgeCharges(s)}/${maxDodgeCharges(s)} · ${dodgeCharges(s) ? '준비됨' : (p.dodgeCooldown / 60).toFixed(1) + '초'}`;
     $('dodge-fill').style.width = `${dodgeCharges(s) ? 100 : Math.max(0, 1 - p.dodgeCooldown / stats.dodgeRecharge) * 100}%`;
-    const aux = activeAuxiliary(s), remaining = aux === 'R43' ? p.timeCooldown ?? 0 : p.auxCooldown ?? 0;
-    $('aux').textContent = aux ? `${RELICS[aux].name} · ${remaining > 0 ? (remaining / 60).toFixed(1) + '초' : '준비됨'}` : '보조 유물 없음';
-    $('aux-fill').style.width = aux ? `${100 * Math.max(0, 1 - remaining / (aux === 'R43' ? TIME.cooldown : BOMB.cooldown))}%` : '0%';
+    const ally = s.enemies.find(e => e.hp > 0 && isAlly(e));
+    if (ally) $('objective').textContent = s.enemies.some(e => e.hp > 0 && !isAlly(e)) || s.boss?.hp
+      ? `남은 적 ${s.enemies.filter(e => e.hp > 0 && !isAlly(e)).length + Number(!!s.boss?.hp)} · 아군 1`
+      : '아군만 남음 · 전환 종료 후 적대 복귀';
+    if(s.phase==='combat'&&currentRoom(s)?.encounter&&!s.replay){const pending=s.enemies.filter(e=>e.spawnTicks).length,elite=s.enemies.find(e=>e.elite);
+      $('objective').textContent=`${currentRoom(s)?.kind==='elite'?'정예방 · ':''}웨이브 ${s.wave}/${info.waves.length} · ${pending?`증원 ${pending}마리 출현 예고`:elite?`정예 ${ENEMY_NAMES[elite.kind]} ${Math.ceil(elite.hp)}/${elite.maxHp}`:$('objective').textContent}`;}
+    $('puppet-status').hidden = !ally;
+    $('puppet-status').textContent = ally ? `아군 ${ENEMY_NAMES[ally.kind]} ${Number(ally.hp.toFixed(1))}/${ally.maxHp} · ${(ally.charm!.ticks / 60).toFixed(1)}초` : '';
+    $('decoy-status').hidden = !s.decoy;
+    $('decoy-status').textContent = s.decoy ? `허수아비 ${Number(s.decoy.hp.toFixed(1))}/30 · ${(s.decoy.ticks / 60).toFixed(1)}초` : '';
+    $('anchor-status').hidden = !s.anchor;
+    $('anchor-status').textContent = s.anchor ? `닻 · ${(Math.hypot(p.x - s.anchor.x, p.y - s.anchor.y) * .04).toFixed(1)}m · ${bindingLabel(bindings.auxiliary)} 귀환${activeAuxiliary(s) === 'R26' ? '' : ' · 닻 장착 필요'}` : '';
+    const aux = activeAuxiliary(s), remaining = aux?auxiliaryCooldown(s,aux):0;
+    $('aux').textContent = aux ? `${RELICS[aux].name} · ${remaining > 0 ? (remaining / 60).toFixed(1) + '초' : aux === 'R26' && s.anchor ? '귀환 준비' : '준비됨'}` : '보조 유물 없음';
+    $('aux-fill').style.width = aux ? `${100 * Math.max(0, 1 - remaining / auxiliaryDuration(aux))}%` : '0%';
+    $('recovery-status').hidden=!hasRelic(s,'R39');$('recovery-status').textContent=`${bindingLabel(bindings.heal)} · 회복품 ${s.recoveryItems?.length ?? 0}/3 · 다음 +${s.recoveryItems?.[0]?.healAmount ?? 0}${s.recoveryCast?` · 사용 중 ${(s.recoveryCast.ticks/60).toFixed(1)}초 · 사격 불가`:''}`;
+    $('portal-status').hidden=!s.portals;$('portal-status').textContent=s.portals?`공허의 문 · ${s.portals.second?'한 쌍 유지':'출구 설치 필요 · Esc 취소'} ${(s.portals.ticks/60).toFixed(1)}초`:'';
+    $('shadow-status').hidden=!hasRelic(s,'R41')&&!p.dodgeLock;$('shadow-status').textContent=p.dodgeLock?`회피 잠금 ${(p.dodgeLock/60).toFixed(1)}초`:p.stealthed?'은신 · 새 목표 획득 차단':`은신 준비 ${((90-(p.quietTicks ?? 0))/60).toFixed(1)}초`;
+    $('absorb-status').hidden=!hasRelic(s,'R42');$('absorb-status').textContent=`흡수 에너지 ${s.absorbEnergy ?? 0}/5${s.absorption?` · 채널 ${(s.absorption.ticks/60).toFixed(1)}초 · 이동·사격 불가`:` · 안전한 방 ${bindingLabel(bindings.inventory)}에서 대기 단축`}`;
+    $('sealed-status').hidden=!s.crown;$('sealed-status').textContent=s.crown?`봉인 왕관 · A ${s.crown.a.region}지역 ${s.crown.a.room}번 · ${s.crown.selectedIds.length}/2 · B 포기됨`:'';
+    document.querySelector('.abilities')?.classList.toggle('has-remaining-states',hasRelic(s,'R39')||!!s.portals||hasRelic(s,'R41')||hasRelic(s,'R42')||!!s.crown);
+    if(s.replay)$('objective').textContent=`지도 재전투 · 남은 적 ${s.enemies.length} · 추가 보상 없음`;
+    if(s.phase==='explore'&&currentRoom(s)?.pickups?.length)$('objective').textContent=`미수집 바닥 보상 ${currentRoom(s)!.pickups!.length}개 · 문을 나가면 사라집니다`;
+    if(p.dodgeLock)$('dodge').textContent=`잠금 ${(p.dodgeLock/60).toFixed(1)}초`;
+    $('stone-status').hidden = !s.stoneWall;
+    $('stone-status').textContent = s.stoneWall ? `돌벽 ${Number(s.stoneWall.hp.toFixed(1))}/40 · ${(s.stoneWall.ticks / 60).toFixed(1)}초` : '';
     $('time-status').textContent = s.timeStop ? `시간 정지 ${(s.timeStop.ticks / 60).toFixed(1)}초` : s.timeDebt ? `시간의 빚 · ${(s.timeDebt / 60).toFixed(1)}초` : '';
     $('weak-status').hidden = !p.weakTicks;
     $('weak-status').textContent = p.weakTicks ? `약화 · 피해 −20% · ${(p.weakTicks / 60).toFixed(1)}초` : '';
@@ -54,6 +86,28 @@ export class CombatHud {
     $('stomp-status').textContent = `착지 충격파 · ${p.stompCooldown ? (p.stompCooldown / 60).toFixed(1) + '초' : '준비됨'}`;
     $('silence-status').hidden = !hasRelic(s, 'R11');
     $('silence-status').textContent = `침묵의 종 · ${p.silenceCooldown ? (p.silenceCooldown / 60).toFixed(1) + '초' : '중단 준비됨'}`;
+    const ready = (ticks?: number) => ticks ? `${(ticks / 60).toFixed(1)}초` : '준비';
+    const passiveStates = [
+      ['R06', `궤도 ${p.orbitCount ?? 0}/4회`, !!s.orbitShots?.length],
+      ['R09', `폭풍 ${ready(p.lightningCooldown)}`, !p.lightningCooldown],
+      ['R10', `중력 ${ready(p.gravityCooldown)}`, !p.gravityCooldown],
+      ['R14', `별빛 ${p.starlightCooldown ? ready(p.starlightCooldown) : (p.starlightRest ?? 0) >= 60 ? '준비' : `휴식 ${((60 - (p.starlightRest ?? 0)) / 60).toFixed(1)}초`}`, !p.starlightCooldown && (p.starlightRest ?? 0) >= 60],
+      ['R15', `가시 ${s.thornTrails?.length ?? 0}/2개`, !!s.thornTrails?.length],
+      ['R19', `수호 ${ready(p.wardCooldown)}`, !p.wardCooldown],
+      ['R21', `이끼 ${s.mossClears ?? 0}/3방`, false],
+      ['R22', `정화 ${ready(p.cleanseCooldown)}`, !p.cleanseCooldown],
+      ['R23', `왕관 ${ready(p.thornsCooldown)}`, !p.thornsCooldown],
+      ['R24', `대피 · ${featherAvailable(s) ? '준비 1/1' : '남은 기회 0/1'}`, featherAvailable(s)],
+      ['R27', `발톱 · ${p.clawUsed ? '이번 회피 사용' : '벽타기 준비'}`, !p.clawUsed],
+      ['R29', '뿌리 당김 −80%', true],
+      ['R31', '길잡이 방 공개', true],
+      ['R32', `주사위 ${s.diceRerolls ?? 0}/2회`, (s.diceRerolls ?? 0) > 0],
+    ] as const;
+    $('passive-status').hidden = !passiveStates.some(([id]) => hasRelic(s, id));
+    for (const [id, text, active] of passiveStates) {
+      const el = $(`passive-${id}`); el.hidden = !hasRelic(s, id); el.textContent = text;
+      el.title = `${RELICS[id].name} · ${RELICS[id].description}`; el.dataset.active = String(active);
+    }
     const weapon = WEAPONS[s.weapon ?? 'W01']; $('weapon-name').textContent = weapon.name;
     $('weapon-stats').textContent = `탄환당 피해 ${Number(playerDamage(s, stats.damage).toFixed(2))}${stats.damageBonus ? ` (+${Math.round(stats.damageBonus * 100)}%)` : ''} · 발사 간격 ${(stats.fireInterval / 60).toFixed(2)}초`;
     $('fang-status').hidden = !hasRelic(s, 'R51');
@@ -63,9 +117,10 @@ export class CombatHud {
     $('crown-status').dataset.active = String(stats.crownActive);
     $('crown-status').textContent = `태양의 왕관 · ${stats.crownActive ? '발동 중 +35%' : '생명력 80% 이상에서 발동'}`;
     $('weapon-id').textContent = `${s.weapon ?? 'W01'} / ${s.weapon === 'W04' ? 'RIFT STAFF' : s.weapon === 'W03' ? 'OBSERVER CROSSBOW' : weapon.pellets > 1 ? 'SCATTER RELIC' : 'RELIC SIDEARM'}`;
-    $('relic-count').textContent = `유물 ${s.expedition!.relics.length}개`;
-    const newMapKey = `${s.seed}:${s.expedition!.region}:${s.expedition!.room}:${s.expedition!.dungeon!.rooms.filter(r => r.visited).length}:${s.phase}`;
-    if (newMapKey !== this.mapKey) { this.mapKey = newMapKey; $('mini-map').innerHTML = dungeonMapMarkup(s); }
+    $('relic-count').textContent = `유물 ${s.expedition?.relics.length??0}개`;
+    const maze=s.expedition?.dungeon;
+    const newMapKey = `${s.seed}:${s.expedition?.region}:${s.expedition?.room}:${maze?.rooms.filter(r => r.visited).length}:${s.phase}:${hasRelic(s, 'R31')}:${hasRelic(s,'R48')}:${maze?.rooms[11]?.locked}`;
+    if (newMapKey !== this.mapKey) { this.mapKey = newMapKey; $('mini-map').innerHTML = maze?dungeonMapMarkup(s):`<span>${info.total===1?'이전 단일 석실':`${info.index+1} / ${info.total} 석실`}</span>`; }
     $('boss-hud').hidden = !s.boss || s.boss.hp <= 0;
     if (s.boss) {
       const b = s.boss; $('boss-name').textContent=b.kind==='relicheart'?'유물 심장':b.kind==='chainpriest'?'사슬의 사제':'문지기 석상'; $('boss-health').textContent = `${Math.ceil(b.hp)} / ${b.maxHp}`; $('boss-stage').textContent = `${b.stage}단계`;
@@ -76,12 +131,13 @@ export class CombatHud {
         $('boss-pattern').textContent = '방패 해제 · 재정비 중 · 지금 공격하세요';
     }
     const chestRoom = currentRoom(s)?.kind === 'treasure' && currentRoom(s)?.reward === null;
-    if (chestRoom) $('objective').textContent = '가운데 유물 상자에 다가가 E키로 여세요';
-    $('interact').hidden = modal !== '' || (!canOpenTreasure(s) && currentRoom(s)?.kind !== 'shop');
-    const interactKey = chestRoom ? 'chest' : 'shop';
+    if (chestRoom) $('objective').textContent = `가운데 유물 상자에 다가가 ${bindingLabel(bindings.interact)}키로 여세요`;
+    const locked=lockedDoorNearby(s),bossLoot=s.boss?.hp===0&&currentRoom(s)?.kind==='boss';
+    $('interact').hidden = modal !== '' || (!canOpenTreasure(s) && currentRoom(s)?.kind !== 'shop'&&!locked&&!bossLoot);
+    const interactKey = `${locked?'lock':bossLoot?'boss':chestRoom ? 'chest' : 'shop'}:${bindings.interact}`;
     if (interactKey !== this.interactKey) {
       this.interactKey = interactKey;
-      $('interact').innerHTML = `<kbd>E</kbd> ${chestRoom ? '유물 상자 열기' : '상인과 거래하기'}`;
+      $('interact').innerHTML = `<kbd>${bindingLabel(bindings.interact)}</kbd> ${locked?'잠금 보물방 · 열쇠로 개방':bossLoot?'보스 결과 · 다음 지역':chestRoom ? '유물 상자 열기' : '상인과 거래하기'}`;
     }
     $('damage-veil').classList.toggle('hurt', !reducedMotion && p.invulnerable > 37 && p.invulnerable <= 45);
     $('crosshair').hidden = !!modal;

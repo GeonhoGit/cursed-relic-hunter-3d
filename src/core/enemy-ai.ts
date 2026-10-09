@@ -7,6 +7,11 @@ import { stoppedEnemy } from './time-debt';
 import { advanceRiftSummon, startRiftSummon } from './rift-shaman';
 import { advanceSilence } from './silence';
 import { ageLens } from './rift-lens';
+import { enemyTarget, isAlly, resetEnemyAttack } from './allegiance';
+import { npcAttack } from './npc-combat';
+import { generatedShots } from './relic-fields';
+import { BODY_HEIGHT, EYE_HEIGHT } from './fps-geometry';
+import { eliteCooldown } from './elite';
 
 type Neighbor = Point & { id: number; kind: Enemy['kind'] };
 const BODY_RADIUS = ENEMY_BODY_RADIUS;
@@ -91,19 +96,63 @@ function steer(e: Enemy, goal: Point, player: Point, neighbors: Neighbor[], layo
   }
 }
 
+function ageEnemy(state: RunState, e: Enemy): boolean {
+  if (e.hp <= 0) return false;
+  if (e.frost?.freezeTicks) { e.frost.freezeTicks--; return false; }
+  if (stoppedEnemy(state, e.id)) return false;
+  if (e.spawnTicks) { e.spawnTicks--; return false; }
+  e.flash = Math.max(0, e.flash - 1); ageLens(e);
+  if (e.contactCooldown && --e.contactCooldown <= 0) delete e.contactCooldown;
+  return !advanceSilence(e);
+}
 export function advanceEnemies(state: RunState, velocity: Point, before: Point = state.player, height = state.player.height ?? 0): EnemyHit[] {
-  const player = state.player, layout = roomLayout(state);
+  if (!state.player.stealthed && !state.decoy && !state.enemies.some(e => isAlly(e) || e.targetId !== undefined || e.contactCooldown)) return advanceEnemyGroup(state, velocity, before, height);
+  const positions = new Map(state.enemies.map(e => [e.id, { x: e.x, y: e.y }]));
+  if (state.boss) positions.set(state.boss.id, { x: state.boss.x, y: state.boss.y });
+  if (state.decoy) positions.set(state.decoy.id, { x: state.decoy.x, y: state.decoy.y });
+  const hits: EnemyHit[] = [];
+  for (const e of [...state.enemies]) {
+    if (!ageEnemy(state, e)) continue;
+    const target = enemyTarget(state, e);
+    if (!target) {
+      if (e.mode === 'windup' || e.mode === 'charge' || e.comboStrike) { resetEnemyAttack(e); e.mode = 'recover'; e.timer = eliteCooldown(e,ENEMY_ATTACK[e.kind].cooldownTicks); }
+      else e.timer = Math.max(0, e.timer - 1);
+      continue;
+    }
+    const saved = { ...e }, walls = roomLayout(state).walls;
+    const originalPlayer = target === state.player;
+    const context: RunState = originalPlayer ? state : { ...state, player: { ...state.player, x: target.x, y: target.y, height: 0, jumpVelocity: 0 } };
+    const incoming = advanceEnemyGroup(context, originalPlayer ? velocity : { x: 0, y: 0 },
+      originalPlayer ? before : positions.get('id' in target ? target.id : 0) ?? target, originalPlayer ? height : 0, e, true, state);
+    if (!originalPlayer) {
+      state.nextId = Math.max(state.nextId, context.nextId);
+      if (state.stoneWall && state.stoneWall.hp <= 0) delete state.stoneWall;
+    }
+    const npcImpact = npcAttack(state, saved, e, walls, positions);
+    const playerHits = originalPlayer ? incoming : playerSpecialHits(state, saved, walls, before, height);
+    const retained = saved.mode === 'charge' && npcImpact.chargeIntercepted ? playerHits.filter(h => h.cause !== '돌진 파수꾼의 돌진') : playerHits;
+    if (saved.mode === 'charge' && retained.some(h => h.cause === '돌진 파수꾼의 돌진')) e.chargeHit = true;
+    hits.push(...retained);
+    if (!state.decoy && !state.enemies.some(isAlly) && !isAlly(e) && e.targetId === 0 && !['windup', 'charge'].includes(e.mode) && !e.comboStrike) delete e.targetId;
+  }
+  return hits;
+}
+function playerSpecialHits(state: RunState, before: Enemy, walls: Box[], previousPlayer: Point, height: number): EnemyHit[] {
+  if (isAlly(before) || !(before.mode === 'charge' && !before.chargeHit
+    || before.mode === 'windup' && before.timer === 1 && !before.blinkTarget && !before.summonPoints)) return [];
+  const wall = walls.find(w => 'hp' in w && 'ticks' in w) as RunState['stoneWall'];
+  // Query the original attack against the real player without committing its timers,
+  // cues, allocation or wall damage a second time.
+  const context: RunState = { ...state, player: { ...state.player }, stoneWall: wall ? { ...wall } : undefined, cues: [], bullets: [] };
+  return advanceSpecialEnemy(context, { ...before }, previousPlayer, height).hits;
+}
+function advanceEnemyGroup(state: RunState, velocity: Point, before: Point = state.player, height = state.player.height ?? 0, only?: Enemy, aged = false, original = state): EnemyHit[] {
+  const player = state.player, base = roomLayout(state), layout = { ...base, obstacles: [...base.obstacles,...(state.expedition?.dungeon?.rooms[state.expedition.room]?.pits ?? [])] };
   const neighbors = state.enemies.map(e => ({ id: e.id, kind: e.kind, x: e.x, y: e.y }));
   const hits: EnemyHit[] = [];
   // New summons start their grace period on the next simulation tick.
-  for (const e of [...state.enemies]) {
-    if (e.hp <= 0) continue;
-    if (e.frost?.freezeTicks) { e.frost.freezeTicks--; continue; }
-    if (stoppedEnemy(state, e.id)) continue;
-    if (e.spawnTicks) { e.spawnTicks--; continue; }
-    e.flash = Math.max(0, e.flash - 1);
-    ageLens(e);
-    if (advanceSilence(e)) continue;
+  for (const e of only ? [only] : [...state.enemies]) {
+    if (!aged && !ageEnemy(state, e)) continue;
     if (e.kind === 'rat') {
       // Old saves may contain a bite windup or recovery; resume pursuit instead.
       e.mode = 'move'; e.timer = 0;
@@ -111,17 +160,17 @@ export function advanceEnemies(state: RunState, velocity: Point, before: Point =
       continue;
     }
     if (e.kind === 'readerstatue') {
-      hits.push(...advanceSpecialEnemy(state, e, before, height).hits);
+      hits.push(...advanceSpecialEnemy(state, e, before, height, original.player).hits);
       continue;
     }
     if (e.kind === 'sealcaster') {
-      const action = advanceSpecialEnemy(state, e); hits.push(...action.hits);
+      const action = advanceSpecialEnemy(state, e, state.player, state.player.height ?? 0, original.player); hits.push(...action.hits);
       if (action.move) steer(e, archerGoal(e, player, layout), player, neighbors, layout);
       continue;
     }
-    if (e.kind === 'riftshaman' && e.summonPoints) { advanceRiftSummon(state, e); continue; }
+    if (e.kind === 'riftshaman' && e.summonPoints) { advanceRiftSummon(original, e); continue; }
     if (e.kind === 'guard' || e.kind === 'shield' || e.kind === 'heartguard' || e.kind === 'voidknight' || e.kind === 'chainhound') {
-      const action = advanceSpecialEnemy(state, e); hits.push(...action.hits);
+      const action = advanceSpecialEnemy(state, e, before, height, original.player); hits.push(...action.hits);
       if (action.move) steer(e, reachableGoal(player, layout.obstacles), player, neighbors, layout);
       continue;
     }
@@ -131,9 +180,19 @@ export function advanceEnemies(state: RunState, velocity: Point, before: Point =
         const angle = Math.atan2(e.targetY - e.y, e.targetX - e.x);
         const speed = ENEMY_ATTACK[e.kind].projectileSpeed;
         const offsets = e.kind === 'watcher' ? Array.from({length:6},(_,i)=>i*Math.PI/3) : e.kind === 'ashpriest' ? [-0.24, 0, 0.24] : [0];
-        for (const offset of offsets) state.bullets.push({ id: state.nextId++, x: e.x, y: e.y,
+        for (const offset of offsets) {
+          if (isAlly(e) && (generatedShots(state) >= 120 || state.bullets.length + (state.orbitShots?.length ?? 0) >= 240)) continue;
+          const target = e.targetId ? state.enemies.find(q => q.id === e.targetId) ?? (state.boss?.id === e.targetId ? state.boss : state.decoy?.id === e.targetId ? state.decoy : undefined) : undefined;
+          const dh = state.view && target ? BODY_HEIGHT[target.kind] / 2 - EYE_HEIGHT : 0;
+          const vertical = dh / (distance(e, player) || 1) * speed, scale = speed / Math.hypot(speed, vertical);
+          state.bullets.push({ id: state.nextId++, x: e.x, y: e.y,
           vx: Math.cos(angle + offset) * speed, vy: Math.sin(angle + offset) * speed,
-          life: 240, owner: 'enemy', damage: attack.damage, ...(['ashpriest','watcher','riftshaman'].includes(e.kind) ? { source: e.kind as 'ashpriest' | 'watcher' | 'riftshaman' } : {}) });
+          ...(state.view && target ? { height: EYE_HEIGHT, heightVelocity: vertical * scale, vx: Math.cos(angle + offset) * speed * scale, vy: Math.sin(angle + offset) * speed * scale } : {}),
+          life: 240, owner: isAlly(e) ? 'player' : 'enemy', damage: isAlly(e) && e.kind === 'riftshaman' ? 8 : attack.damage,
+          ...(isAlly(e) ? { kind: 'ally' as const, originalEnemyId: e.id, sourceRelicId: 'R17' as const }
+            : state.expedition?.acquired.includes('R17') ? { originalEnemyId: e.id } : {}),
+          ...(['ashpriest','watcher','riftshaman'].includes(e.kind) ? { source: e.kind as 'ashpriest' | 'watcher' | 'riftshaman' } : {}) });
+        }
         e.mode = 'recover'; e.timer = attack.cooldownTicks;
       }
       continue;
@@ -144,7 +203,7 @@ export function advanceEnemies(state: RunState, velocity: Point, before: Point =
       if (e.timer === 0) e.mode = 'move';
     }
     const near = distance(e, player);
-    if (e.kind === 'riftshaman' && e.timer === 0 && startRiftSummon(state, e)) continue;
+    if (e.kind === 'riftshaman' && !isAlly(e) && e.timer === 0 && startRiftSummon(original, e)) continue;
     const inRange = near >= (e.kind === 'ashpriest' ? 80 : 110) && near <= 280;
     if (e.timer === 0 && inRange && visible(e, player, 2, layout.walls)) {
       e.mode = 'windup'; e.timer = attack.windupTicks;

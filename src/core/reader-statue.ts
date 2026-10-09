@@ -3,6 +3,7 @@ import { ENEMY_ATTACK } from './enemy-balance';
 import { PLAYER_BODY_HEIGHT } from './fps-geometry';
 import { distance, segmentBox, visible } from './geometry';
 import { roomLayout } from './room-layout';
+import { strikeStoneWall } from './masonry';
 
 const attack = ENEMY_ATTACK.readerstatue;
 
@@ -44,6 +45,7 @@ export function advanceReaderStatue(s: RunState, e: Enemy, before: Point, height
   if (e.mode === 'windup') {
     if (--e.timer <= 0) {
       if (laserHits(s, e, before, height)) hits.push({ damage: attack.damage, cause: '독서 석상의 레이저' });
+      strikeStoneWall(s, e, { x: e.x + Math.cos(e.angle) * attack.range, y: e.y + Math.sin(e.angle) * attack.range }, attack.damage);
       cancelStatueLaser(e); e.laserTicks = attack.effectTicks;
     }
     return idle;

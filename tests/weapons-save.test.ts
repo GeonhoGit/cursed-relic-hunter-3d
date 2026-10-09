@@ -26,7 +26,7 @@ describe('weapon persistence', () => {
     const won = await store.save(old, defaultSettings()); expect(won.profile!.bossDefeated).toBe(true);
     const select = store.save(old, defaultSettings(), undefined, 'W02'); const settings = store.save(old, { ...defaultSettings(), sound: false });
     await select; const result = await settings;
-    expect(result.content).toBe('prototype-0.13'); expect(selectedWeapon(result.profile!)).toBe('W02'); expect(result.run).toEqual(old);
+    expect(result.content).toBe('prototype-0.16'); expect(selectedWeapon(result.profile!)).toBe('W02'); expect(result.run).toEqual(old);
     const reset = await store.save(null, defaultSettings(), emptyInvestment()); expect(selectedWeapon(reset.profile!)).toBe('W02'); expect(earnedPoints(reset.profile!)).toBe(5);
   });
   it('restores an in-flight shotgun volley, cooldown and spent split budget with identical future behavior', async () => {

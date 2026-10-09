@@ -1,5 +1,6 @@
 import type { Boss, Bullet, Enemy, RunState } from './model';
 import { hasRelic } from './relics';
+import { generatedShots } from './relic-fields';
 
 export function frostHit(s: RunState, e: Enemy | Boss, b: Bullet) {
   if (b.kind || !hasRelic(s, 'R08') || e.hp <= 0) return;
@@ -22,7 +23,7 @@ export function splitShot(s: RunState, b: Bullet, target: Enemy | Boss, pending:
   // Every pellet shares the volley budget; surviving siblings retain it in saves.
   const eventId = b.eventId ?? b.id;
   for (const sibling of s.bullets) if (sibling.owner === 'player' && !sibling.kind && (sibling.eventId ?? sibling.id) === eventId) sibling.splitDone = true;
-  if (s.bullets.filter(q => q.kind === 'split').length + pending.length + 3 > 120) return;
+  if (generatedShots(s) + pending.length + 3 > 120) return;
   const angle = Math.atan2(b.vy, b.vx);
   const pitch = Math.atan2(b.heightVelocity ?? 0, Math.hypot(b.vx, b.vy));
   for (const offset of [-25, 0, 25]) {

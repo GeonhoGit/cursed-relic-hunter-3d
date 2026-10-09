@@ -18,7 +18,7 @@ export function interpolateMotion(s: RunState, previous: MotionFrame | null, alp
     return { x: before.x + (now.x - before.x) * t, y: before.y + (now.y - before.y) * t,
       height: before.height + (now.height - before.height) * t, angle: before.angle + angle * t };
   };
-  current.player = blend(current.player, previous.player);
+  current.player = s.player.teleportTick === s.tick ? current.player : blend(current.player, previous.player);
   for (const [id, pose] of current.enemies) current.enemies.set(id, blend(pose, previous.enemies.get(id)));
   for (const [id, pose] of current.bullets) current.bullets.set(id, blend(pose, previous.bullets.get(id)));
   return current;

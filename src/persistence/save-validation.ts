@@ -12,11 +12,22 @@ import { ENCOUNTER_SIZE, ENEMY_ATTACK, ENEMY_HEALTH } from '../core/enemy-balanc
 import { distance, visible } from '../core/geometry';
 import { roomLayout } from '../core/room-layout';
 import { ROOM_STRUCTURES } from '../core/room-structures';
-import { defaultProfile, earnedPoints, growthStats, investedPoints, validGrowthId, validInvestment, validProfile } from '../core/growth';
+import { defaultProfile, earnedPoints, growthRelicUnlocks, growthStats, investedPoints, validGrowthId, validInvestment, validProfile } from '../core/growth';
 import { currentWeapon, isWeapon, weaponUnlocked } from '../core/weapons';
 import { CHALICE } from '../core/survival-relics';
 
 import type { SaveRecord, Settings } from './save-types';
+import { validExpansionCue, validRelicExpansion } from './relic-validation';
+import { validMasonry } from './masonry-validation';
+import { isAuxiliary } from '../core/auxiliary';
+import { validAuxiliaryState, validPuppets } from './auxiliary-validation';
+import { validScarecrow } from './scarecrow-validation';
+import { validMovementRelics } from './movement-validation';
+import { validEvacuation } from './evacuation-validation';
+import { validRemainingRelics } from './remaining-validation';
+import { validEncounter,validWaveState } from './wave-validation';
+import { eliteCooldown,eliteHealth } from '../core/elite';
+import { validKeyBindings } from '../core/keybindings';
 
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const validChaliceHealing = (v: unknown) => finite(v) && v >= 0 && v <= CHALICE.roomCap;
@@ -30,7 +41,7 @@ function validFrost(f: Frost | undefined, tick: number): boolean {
     && f.hits.every(h => h && integer(h.eventId, 0, Number.MAX_SAFE_INTEGER) && integer(h.tick, Math.max(0, tick - 180), tick)));
 }
 function validProjectileEffect(b: Bullet, tick: number): boolean {
-  if ((b.kind !== undefined && !['split', 'reflected'].includes(b.kind)) || (b.phase !== undefined && b.phase !== 'return')) return false;
+  if ((b.kind !== undefined && !['split', 'reflected', 'orbit', 'ally'].includes(b.kind)) || (b.phase !== undefined && b.phase !== 'return')) return false;
   if (b.owner !== 'player' && [b.kind, b.phase, b.eventId, b.splitDone, b.originTargetId, b.outboundHits].some(v => v !== undefined)) return false;
   if (b.kind === 'reflected') return [12, 15].includes(b.damage) && integer(b.life, 1, 240) && (b.hitIds === undefined || b.hitIds.length === 0)
     && [b.phase, b.source, b.eventId, b.bouncesLeft, b.splitDone, b.originTargetId, b.outboundHits].every(v => v === undefined);
@@ -62,17 +73,19 @@ function validShop(node: DungeonRoom, chosen: RelicId[]): boolean {
 }
 function validMaze(s: RunState, past = false, chosen: RelicId[] = []): boolean {
   const e = s.expedition!, rooms = e.dungeon?.rooms;
-  if (e.dungeon?.layoutVersion !== undefined && e.dungeon.layoutVersion !== 1) return false;
-  if (e.reward !== null || !Array.isArray(rooms) || ![9, 10, 11].includes(rooms.length) || !integer(e.room, 0, rooms.length - 1)
+  const expanded=(e.dungeon?.layoutVersion ?? 0)>=2,newWaves=e.dungeon?.layoutVersion===3;
+  if (e.dungeon?.layoutVersion !== undefined && ![1,2,3].includes(e.dungeon.layoutVersion)) return false;
+  if (e.reward !== null || !Array.isArray(rooms) || !(expanded ? rooms.length===(newWaves?13:12) : [9, 10, 11].includes(rooms.length)) || !integer(e.room, 0, rooms.length - 1)
     || !rooms.every((r, i) => r && r.id === i && integer(r.x, -4, 4) && integer(r.y, -4, 4)
-      && integer(r.template, 0, 2) && ['start', 'combat', 'treasure', 'boss', 'altar', 'shop'].includes(r.kind)
+      && integer(r.template, 0, 2) && ['start', 'combat', 'elite','treasure', 'boss', 'altar', 'shop'].includes(r.kind)
       && (r.structure === undefined || r.kind !== 'boss' && integer(r.structure, 0, ROOM_STRUCTURES.length - 1))
       && (r.chaliceHealed === undefined || validChaliceHealing(r.chaliceHealed) && r.visited
-        && ['combat', 'boss'].includes(r.kind) && e.acquired.includes('R56'))
+        && ['combat', 'elite','boss'].includes(r.kind) && e.acquired.includes('R56'))
       && typeof r.visited === 'boolean' && typeof r.cleared === 'boolean' && (!r.cleared || r.visited))) return false;
   if (new Set(rooms.map(r => `${r.x}/${r.y}`)).size !== rooms.length || rooms[0].kind !== 'start' || rooms[8].kind !== 'boss'
-    || (rooms.length >= 10 && rooms[9].kind !== 'altar') || (rooms.length === 11 && rooms[10].kind !== 'shop')
-    || rooms.filter(r => r.kind === 'combat').length !== 5 || rooms.filter(r => r.kind === 'treasure').length !== 2
+    || (rooms.length >= 10 && rooms[9].kind !== 'altar') || (rooms.length >= 11 && rooms[10].kind !== 'shop') || (expanded && rooms[11].kind!=='treasure')
+    || rooms.filter(r => r.kind === 'combat').length !== 5 || rooms.filter(r => r.kind === 'treasure').length !== (expanded?3:2)
+    ||rooms.filter(r=>r.kind==='elite').length!==(newWaves?1:0)||newWaves&&rooms[12].kind!=='elite'
     || !rooms[0].visited || !rooms[0].cleared || !rooms[e.room].visited) return false;
   const distances = new Map([[0, 0]]), queue = [0];
   while (queue.length) {
@@ -90,35 +103,39 @@ function validMaze(s: RunState, past = false, chosen: RelicId[] = []): boolean {
       dungeon: archive, previousDungeon: undefined, earlierDungeon:undefined } }, true, chosen)) return false;
   }
   for (const node of rooms) {
+    if(!past&&!validEncounter(s,node))return false;
     if (!validShop(node, chosen)) return false;
     if (node.visited && node.id !== e.room && !node.cleared) return false;
-    if (!['treasure', 'altar'].includes(node.kind) || !node.visited) { if (node.reward !== null) return false; continue; }
+    if(node.reward?.forfeited===true){if(!expanded||!node.mainReward||node.reward.choice!=='skip'||node.reward.candidates.length!==0) return false;continue;}
+    if (!(node.mainReward||['treasure', 'altar','elite'].includes(node.kind)) || !node.visited) { if (node.reward !== null) return false; continue; }
     const r = node.reward;
     // A visited treasure room stays traversable while its chest is unopened.
-    if (node.kind === 'treasure' && node.cleared && r === null) continue;
-    if (!node.cleared || !r || r.room !== node.id || !relicList(r.candidates) || r.candidates.length < 1 || r.candidates.length > 3
-      || (r.rerolled !== undefined && (r.rerolled !== true || node.kind !== 'treasure'))) return false;
-    if (node.kind === 'altar' ? r.candidates.length !== 2 || r.candidates[0] !== 'R38' || r.candidates[1] !== 'R43' : r.candidates.some(isCurse)) return false;
+    if ((node.kind === 'treasure'||node.mainReward||node.kind==='elite'&&!node.cleared) && r === null) continue;
+    if (!node.cleared || !r || r.room !== node.id || !relicList(r.candidates) || r.candidates.length > 4
+      || (r.rerolled !== undefined && (r.rerolled !== true || node.kind==='altar'))) return false;
+    if (node.kind === 'altar' ? expanded ? r.candidates.length>2||r.candidates.some(id=>!isCurse(id)) : r.candidates.length!==2||r.candidates[0]!=='R38'||r.candidates[1]!=='R43' : r.candidates.some(isCurse)) return false;
+    if(r.selectedIds!==undefined&&(!relicList(r.selectedIds)||r.selectedIds.length>2||!r.selectedIds.every(id=>r.candidates.includes(id)&&e.acquired.includes(id))))return false;
+    chosen.push(...(r.selectedIds ?? []));
     if (r.choice === null) {
-      if (node.kind !== 'altar' && (node.id !== e.room || s.phase !== 'cleared' || r.candidates.some(id => e.acquired.includes(id)))) return false;
-    } else if (r.choice !== 'skip') {
+      if (node.kind !== 'altar' && (node.id !== e.room || s.phase !== 'cleared' && !s.replay || r.candidates.some(id => e.acquired.includes(id)&&!r.selectedIds?.includes(id)))) return false;
+    } else if (r.choice !== 'skip'&&r.choice!=='gold') {
       if (!r.candidates.includes(r.choice) || !e.acquired.includes(r.choice)) return false;
-      chosen.push(r.choice);
+      if(!r.selectedIds?.includes(r.choice))chosen.push(r.choice);
     }
   }
   if (!past && (new Set(chosen).size !== chosen.length || chosen.length !== e.acquired.length || !e.acquired.every(id => chosen.includes(id)))) return false;
   const node = currentRoom(s)!;
-  if (s.wave !== 1 || s.waveDelay !== 0 || !integer(s.readyTicks, 0, 48)) return false;
-  if (s.phase === 'explore') return node.cleared && node.kind !== 'boss' && (node.kind === 'altar' || node.reward?.choice !== null) && s.enemies.length === 0;
+  if (!past&&(!integer(s.wave,1,newWaves&&!s.replay?Math.max(1,roomInfo(s).waves.length):1)||s.waveDelay!==0||!integer(s.readyTicks,0,48)))return false;
+  if (s.phase === 'explore') return node.cleared && (node.kind !== 'boss'||expanded&&s.boss?.hp===0) && (node.kind === 'altar' || node.reward?.choice !== null) && s.enemies.length === 0;
   if (node.kind === 'treasure' || node.kind === 'altar') return s.phase === 'cleared' && node.reward?.choice === null && s.enemies.length === 0;
   if (node.kind === 'start' || node.kind === 'shop') return false;
-  if (s.phase === 'cleared') return node.kind === 'boss' && node.cleared;
-  return !node.cleared;
+  if (s.phase === 'cleared') return node.cleared && (node.kind === 'boss'||(node.mainReward===true||node.kind==='elite')&&node.reward?.choice===null);
+  return !node.cleared || !!s.replay&&node.kind==='combat'&&node.cleared;
 }
 function validExpedition(s: RunState): boolean {
   const e = s.expedition;
   if (e === undefined) return true; // Retain original single-room snapshots without rewriting them.
-  if (!e || (e.route !== undefined && e.route !== 'gatekeeper' && e.route !== 'maze') || !integer(e.room, 0, e.route === 'maze' ? 10 : e.route ? 3 : 2) || !relicList(e.relics) || !relicList(e.acquired)
+  if (!e || (e.route !== undefined && e.route !== 'gatekeeper' && e.route !== 'maze') || !integer(e.room, 0, e.route === 'maze' ? 12 : e.route ? 3 : 2) || !relicList(e.relics) || !relicList(e.acquired)
     || !e.relics.every(id => e.acquired.includes(id))) return false;
   if ((e.region !== undefined && (e.route !== 'maze' || ![1, 2, 3].includes(e.region)))
     || ((e.region === 2 || e.region === 3) ? !e.previousDungeon : e.previousDungeon !== undefined)
@@ -128,9 +145,9 @@ function validExpedition(s: RunState): boolean {
   const r = e.reward;
   if (r === null) return s.phase !== 'cleared' || !roomInfo(s).reward;
   if (!r || s.phase !== 'cleared' || r.room !== e.room || !roomInfo(s).reward
-    || !relicList(r.candidates) || r.candidates.length > 3
+    || !relicList(r.candidates) || r.candidates.length > 4
     || (r.rerolled !== undefined && (r.rerolled !== true || !r.candidates.length || r.candidates.some(isCurse)))) return false;
-  if (r.choice !== null && r.choice !== 'skip' && (!r.candidates.includes(r.choice) || !e.relics.includes(r.choice))) return false;
+  if (r.choice !== null && r.choice !== 'skip' && r.choice!=='gold' && (!r.candidates.includes(r.choice) || !e.relics.includes(r.choice))) return false;
   return r.candidates.every(id => !e.acquired.includes(id) || id === r.choice);
 }
 function validBurn(e: { burnTicks?: number; burnPulse?: number; burnDamage?: number }) {
@@ -192,8 +209,8 @@ function validSealCaster(e: Enemy) {
 function validChainHound(e: Enemy) {
   if (e.kind !== 'chainhound') return true;
   const attack = ENEMY_ATTACK.chainhound;
-  return e.maxHp === ENEMY_HEALTH.chainhound && e.hp >= 0 && e.hp <= e.maxHp && ['move','windup','recover'].includes(e.mode)
-    && integer(e.timer, e.mode === 'windup' ? 1 : 0, e.mode === 'windup' ? attack.windupTicks : attack.cooldownTicks)
+  return e.maxHp === (e.elite?eliteHealth(e.kind):ENEMY_HEALTH.chainhound) && e.hp >= 0 && e.hp <= e.maxHp && ['move','windup','recover'].includes(e.mode)
+    && integer(e.timer, e.mode === 'windup' ? 1 : 0, e.mode === 'windup' ? attack.windupTicks : eliteCooldown(e,attack.cooldownTicks))
     && (e.mode !== 'windup' || (e.hp > 0 && e.targetX >= BOUNDS.x + 7 && e.targetX <= BOUNDS.x + BOUNDS.w - 7
       && e.targetY >= BOUNDS.y + 7 && e.targetY <= BOUNDS.y + BOUNDS.h - 7));
 }
@@ -241,7 +258,7 @@ function validBoss(s: RunState): boolean {
 function validCurses(s: RunState): boolean {
   const p = s.player, stop = s.timeStop, revival = s.revival;
   if (p.equippedAux !== undefined && p.equippedAux !== null
-    && (!['R13', 'R43'].includes(p.equippedAux) || !hasRelic(s, p.equippedAux))) return false;
+    && (!isAuxiliary(p.equippedAux) || !hasRelic(s, p.equippedAux))) return false;
   if (p.timeCooldown !== undefined && !integer(p.timeCooldown, 0, 1080)) return false;
   if (s.timeDebt !== undefined && !integer(s.timeDebt, 0, 180)) return false;
   const ids = (v: unknown, limit: number): v is number[] => Array.isArray(v) && v.length <= limit
@@ -283,7 +300,7 @@ export function validRun(value: unknown): value is RunState {
   if (s.player.dodgeCarry !== undefined && (!s.growth || !finite(s.player.dodgeCarry) || s.player.dodgeCarry < 0 || s.player.dodgeCarry >= 1)) return false;
   if (s.player.auxCooldown !== undefined && !integer(s.player.auxCooldown, 0, 480)) return false;
   // Validate room/relic structure before bombs request its collision geometry.
-  if (!validExpedition(s)) return false;
+  if (!validExpedition(s) || !validAuxiliaryState(s) || !validPuppets(s) || !validMasonry(s) || !validRelicExpansion(s) || !validScarecrow(s) || !validMovementRelics(s) || !validEvacuation(s)||!validRemainingRelics(s)||!validWaveState(s)) return false;
   if (s.chaliceHealed !== undefined && (s.expedition?.route === 'maze' || !validChaliceHealing(s.chaliceHealed)
     || !s.expedition?.acquired.includes('R56'))) return false;
   // Retain the former 15% ceiling for saved cooldowns already in progress, including after relic loss.
@@ -310,18 +327,18 @@ export function validRun(value: unknown): value is RunState {
   return s.enemies.every(e => e && ['rat', 'archer', 'guard', 'shield', 'ashpriest','watcher','heartguard','riftshaman','voidknight','sealcaster','chainhound','readerstatue'].includes(e.kind) && ['move', 'windup', 'recover', 'charge'].includes(e.mode)
     && validLens(s, e) && validSilence(s, e) && validShaman(s, e) && validVoidKnight(s, e) && validSealCaster(e) && validChainHound(e) && validReaderStatue(e)
     && (e.kind === 'heartguard'
-      ? e.maxHp === ENEMY_HEALTH.heartguard && e.hp >= 0 && e.hp <= e.maxHp && (e.mode === 'windup'
+      ? e.maxHp === (e.elite?eliteHealth(e.kind):ENEMY_HEALTH.heartguard) && e.hp >= 0 && e.hp <= e.maxHp && (e.mode === 'windup'
         ? [1,2].includes(e.comboStrike ?? 0) && integer(e.timer, 1, e.comboStrike === 1 ? ENEMY_ATTACK.heartguard.windupTicks : ENEMY_ATTACK.heartguard.followupTicks)
         : e.mode === 'recover' && e.comboStrike === 2
           ? integer(e.timer, 1, ENEMY_ATTACK.heartguard.comboPauseTicks)
-          : e.comboStrike === undefined && ['move','recover'].includes(e.mode) && integer(e.timer, 0, ENEMY_ATTACK.heartguard.cooldownTicks))
+          : e.comboStrike === undefined && ['move','recover'].includes(e.mode) && integer(e.timer, 0, eliteCooldown(e,ENEMY_ATTACK.heartguard.cooldownTicks)))
       : e.comboStrike === undefined)
     && (e.shieldHp === undefined || (e.kind === 'shield' && finite(e.shieldHp) && e.shieldHp >= 0 && e.shieldHp <= ENEMY_ATTACK.shield.durability))
     && [e.id, e.x, e.y, e.hp, e.maxHp, e.angle, e.timer, e.targetX, e.targetY, e.flash].every(finite)
     && (e.chargeHit === undefined || (e.kind === 'guard' && typeof e.chargeHit === 'boolean'))
     && (e.mode !== 'charge' || (e.kind === 'guard' && typeof e.chargeHit === 'boolean' && integer(e.timer, 1, 60)))
-    && (!['guard', 'shield', 'ashpriest','watcher'].includes(e.kind) || (e.maxHp === ENEMY_HEALTH[e.kind] && e.hp >= 0 && e.hp <= e.maxHp
-      && integer(e.timer, e.mode === 'windup' ? 1 : 0, e.mode === 'windup' ? ENEMY_ATTACK[e.kind].windupTicks : ENEMY_ATTACK[e.kind].cooldownTicks)))
+    && (!['guard', 'shield', 'ashpriest','watcher'].includes(e.kind) || (e.maxHp === (e.elite?eliteHealth(e.kind):ENEMY_HEALTH[e.kind]) && e.hp >= 0 && e.hp <= e.maxHp
+      && integer(e.timer, e.mode === 'windup' ? 1 : 0, e.mode === 'windup' ? ENEMY_ATTACK[e.kind].windupTicks : eliteCooldown(e,ENEMY_ATTACK[e.kind].cooldownTicks))))
     && validBurn(e)
     && (e.spawnTicks === undefined || integer(e.spawnTicks, 0, 48)) && validFrost(e.frost, s.tick))
     && s.enemies.length + s.enemies.reduce((sum, e) => sum + (e.summonPoints?.length ?? 0), s.boss?.reservedSummons ?? 0) <= ENCOUNTER_SIZE.max
@@ -330,21 +347,24 @@ export function validRun(value: unknown): value is RunState {
       && (b.bouncesLeft === undefined || integer(b.bouncesLeft, 0, 2))
       && (b.source === undefined || ['gatekeeper', 'chainpriest', 'ashpriest','watcher','relicheart','riftshaman'].includes(b.source)) && validProjectileEffect(b, s.tick)
       && (b.hitIds === undefined || (Array.isArray(b.hitIds) && b.hitIds.length <= 4 && new Set(b.hitIds).size === b.hitIds.length && b.hitIds.every(id => integer(id, 0, Number.MAX_SAFE_INTEGER)))))
-    && s.cues.every(c => c && ['shot', 'hit', 'hurt', 'kill', 'dodge', 'blast', 'parry', 'stomp'].includes(c.kind) && [c.id, c.x, c.y, c.tick, c.amount].every(finite));
+    && s.cues.every(c => c && [c.id, c.x, c.y, c.tick, c.amount].every(finite)
+      && (['shot', 'hit', 'hurt', 'kill', 'dodge', 'blast', 'parry', 'stomp'].includes(c.kind) || validExpansionCue(s, c)));
 }
 
 export function validRecord(value: unknown): value is SaveRecord {
   if (!value || typeof value !== 'object') return false;
   const r = value as SaveRecord;
-  return r.schema === 1 && ['prototype-0.1', 'prototype-0.2', 'prototype-0.3', 'prototype-0.4', 'prototype-0.5', 'prototype-0.6', 'prototype-0.7', 'prototype-0.8', 'prototype-0.9', 'prototype-0.10', 'prototype-0.11', 'prototype-0.12', 'prototype-0.13'].includes(r.content) && Number.isInteger(r.revision) && r.revision >= 0
+  return r.schema === 1 && ['prototype-0.1', 'prototype-0.2', 'prototype-0.3', 'prototype-0.4', 'prototype-0.5', 'prototype-0.6', 'prototype-0.7', 'prototype-0.8', 'prototype-0.9', 'prototype-0.10', 'prototype-0.11', 'prototype-0.12', 'prototype-0.13','prototype-0.14','prototype-0.15','prototype-0.16'].includes(r.content) && Number.isInteger(r.revision) && r.revision >= 0
     && typeof r.savedAt === 'string' && (r.run === null || validRun(r.run))
-    && (r.profile === undefined ? !['prototype-0.10', 'prototype-0.11', 'prototype-0.12', 'prototype-0.13'].includes(r.content) : validProfile(r.profile))
+    && (r.profile === undefined ? !['prototype-0.10', 'prototype-0.11', 'prototype-0.12', 'prototype-0.13','prototype-0.14','prototype-0.15','prototype-0.16'].includes(r.content) : validProfile(r.profile))
     // W04 was previously a starting weapon; existing expeditions stay readable.
     && (!r.run?.weapon || r.run.weapon === 'W04' || weaponUnlocked(r.profile ?? defaultProfile(), r.run.weapon))
     && (!r.run?.growth || investedPoints(r.run.growth.investment) <= earnedPoints(r.profile ?? defaultProfile()))
     && (!r.run?.growth?.firstRoomCleared || !!r.profile?.rooms.length)
+    && (!r.run?.growth?.relicUnlocks || r.run.growth.relicUnlocks.every(id => growthRelicUnlocks(r.profile ?? defaultProfile()).includes(id)))
     && !!r.settings && [0, 30, 60, 120, 144].includes(r.settings.fps)
     && ['sound', 'reducedMotion', 'showFps'].every(k => typeof r.settings[k as keyof Settings] === 'boolean')
     && (r.settings.mouseSensitivity === undefined || validMouseSensitivity(r.settings.mouseSensitivity))
-    && (r.settings.graphicsQuality === undefined || validGraphicsMode(r.settings.graphicsQuality));
+    && (r.settings.graphicsQuality === undefined || validGraphicsMode(r.settings.graphicsQuality))
+    && (r.settings.bindings===undefined||validKeyBindings(r.settings.bindings));
 }

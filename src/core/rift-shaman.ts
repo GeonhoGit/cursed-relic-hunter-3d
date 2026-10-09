@@ -5,13 +5,14 @@ import { roomLayout } from './room-layout';
 import { spikeTraps } from './traps';
 
 function safeSpawn(s: RunState, p: Point) {
-  return distance(p, s.player) >= 96 && visible(p, p, ENEMY_BODY_RADIUS, roomLayout(s).obstacles)
+  return distance(p, s.player) >= 96 && visible(p, p, ENEMY_BODY_RADIUS, [...roomLayout(s).obstacles,...(s.expedition?.dungeon?.rooms[s.expedition.room]?.pits ?? [])])
     && visible(p, p, ENEMY_BODY_RADIUS, spikeTraps(s))
     && s.enemies.every(e => e.hp <= 0 || distance(p, e) >= 28);
 }
 export function startRiftSummon(s: RunState, e: Enemy): boolean {
   const reserved = s.enemies.reduce((sum, q) => sum + (q.hp > 0 ? q.summonPoints?.length ?? 0 : 0), s.boss?.reservedSummons ?? 0);
-  if (s.riftSummonUsed || s.enemies.filter(q => q.hp > 0).length + reserved + 2 > ENCOUNTER_SIZE.max
+  const limit=s.expedition?.dungeon?.layoutVersion===3?(s.expedition.dungeon.rooms[s.expedition.room].kind==='elite'?6:8):ENCOUNTER_SIZE.max;
+  if (s.riftSummonUsed || s.enemies.filter(q => q.hp > 0).length + reserved + 2 > limit
     || distance(e, s.player) > 280 || !visible(e, s.player, 2, roomLayout(s).walls)) return false;
   const positions = Array.from({ length: 7 }, (_, row) => BOUNDS.y + 45 + row * (BOUNDS.h - 90) / 6)
     .flatMap(y => Array.from({ length: 11 }, (_, column) => ({ x: BOUNDS.x + 45 + column * (BOUNDS.w - 90) / 10, y })))

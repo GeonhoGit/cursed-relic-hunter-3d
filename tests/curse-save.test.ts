@@ -28,7 +28,7 @@ describe('curse save compatibility', () => {
       schema: 1, content: 'prototype-0.7', revision: 3, savedAt: '2026-09-30', run: s, settings: defaultSettings(),
     }, 'current'); tx.oncomplete = () => resolve(); });
     expect((await store.load())!.run).toEqual(s); const saved = await store.save(s, defaultSettings());
-    expect(saved.content).toBe('prototype-0.13'); expect(saved.run!.expedition!.dungeon!.rooms).toHaveLength(9); db.close();
+    expect(saved.content).toBe('prototype-0.16'); expect(saved.run!.expedition!.dungeon!.rooms).toHaveLength(9); db.close();
   });
   it('restores the same time stop targets, debt, cooldown and revival loss with deterministic continuation', async () => {
     const store = new SaveStore('curse-effects'); await store.load();

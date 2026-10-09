@@ -44,13 +44,13 @@ describe('rift staff departure weapon', () => {
   it('fires one 9-damage spell every 42 ticks and applies growth and vertical aim', () => {
     const s = createDungeonRun(42); s.weapon = 'W04' as WeaponId;
     const fire = { ...emptyInput(s), fire: true, aimX: 600, aimY: s.player.y };
-    step(s, fire); expect(s.bullets[0]).toMatchObject({ damage: 9, vx: 250, vy: 0, bouncesLeft: 0 });
+    step(s, fire); expect(s.bullets[0]).toMatchObject({ damage: 12, vx: 250, vy: 0, bouncesLeft: 0 });
     for (let i = 0; i < 41; i++) step(s, fire); expect(s.stats.shots).toBe(1);
     step(s, fire); expect(s.stats.shots).toBe(2);
     const g = createDungeonRun(42); g.weapon = 'W04' as WeaponId;
     beginGrowthRun(g, { ...emptyInvestment(), attack: 1, speed: 1 }, 'rift-growth');
     step(g, { ...emptyInput(g), fire: true, aimPitch: .2 });
-    const b = g.bullets[0]; expect(b.damage).toBeCloseTo(9.045);
+    const b = g.bullets[0]; expect(b.damage).toBeCloseTo(12.06);
     expect(Math.hypot(b.vx, b.vy, b.heightVelocity!)).toBeCloseTo(250);
     expect(growthStats(g).fireInterval).toBeCloseTo(42 / 1.005);
     expect(currentWeapon(g).damage * 60 / currentWeapon(g).interval).toBeLessThan(7 / .4);

@@ -4,6 +4,9 @@ import { distance, moveBody, nextWaypoint, segmentBox, segmentCircle, visible } 
 import { advancePriest, createPriest, startPriestPattern } from './priest-boss';
 import { advanceHeart, checkHeartTransition, createHeart, heartProtected, startHeartPattern } from './heart-boss';
 import { ageLens } from './rift-lens';
+import { clearRelicFields } from './relic-fields';
+import { blastStoneWall, strikeStoneWall } from './masonry';
+import { decoyBounds } from './scarecrow';
 
 export const GATEKEEPER = {
   hp: 1800, bodyRadius: 20, hitRadius: 24, stoneSpeed: 190, chargeSpeed: 360, chargeDistance: 300,
@@ -59,6 +62,7 @@ export function checkBossTransition(s: RunState) {
   b.stage = 2; b.mode = 'transition'; b.timer = GATEKEEPER.transition; b.transitionTick = s.tick;
   delete b.silenceTicks;
   b.rocks = []; b.impactTicks = 0; s.bullets = [];
+  clearRelicFields(s);
   if (b.kind === 'chainpriest') { b.chains = []; delete b.reservedSummons; }
 }
 function recover(b: Boss) {
@@ -82,7 +86,7 @@ function summonRats(s: RunState) {
   b.summonsDone = true;
   const positions = [{ x: 100, y: 90 }, { x: 100, y: 275 }, { x: 320, y: 80 },
     { x: 320, y: 280 }, { x: 540, y: 90 }, { x: 540, y: 275 }]
-    .filter(p => distance(p, s.player) >= 96 && distance(p, b) >= 45)
+    .filter(p => distance(p, s.player) >= 96 && distance(p, b) >= 45 && (!s.decoy || visible(p, p, 10, [decoyBounds(s.decoy)])))
     .sort((a, c) => distance(c, s.player) - distance(a, s.player));
   for (const p of positions.slice(0, 2)) s.enemies.push({ id: s.nextId++, kind: 'rat', ...p, hp: 30, maxHp: 30,
     angle: Math.atan2(s.player.y - p.y, s.player.x - p.x), mode: 'move', timer: 0,
@@ -105,6 +109,7 @@ export function advanceBoss(s: RunState, previousPlayer?:Point, previousHeight?:
   }
   if (b.mode === 'charge') {
     const before = { x: b.x, y: b.y }, length = Math.min(GATEKEEPER.chargeSpeed * DT * moveScale, Math.hypot(b.targetX - b.x, b.targetY - b.y));
+    if (!b.chargeHit && strikeStoneWall(s, b, { x: b.x + Math.cos(b.angle) * length, y: b.y + Math.sin(b.angle) * length }, 18, GATEKEEPER.bodyRadius)) b.chargeHit = true;
     moveBody(b, Math.cos(b.angle) * length, Math.sin(b.angle) * length, GATEKEEPER.bodyRadius, roomLayout(s).obstacles);
     if (!b.chargeHit && segmentCircle(before.x, before.y, b.x, b.y, s.player.x, s.player.y, GATEKEEPER.bodyRadius + 7) !== null) {
       b.chargeHit = true; hits.push({ damage: 18, cause: '문지기 석상의 돌진' });
@@ -138,6 +143,7 @@ export function advanceBoss(s: RunState, previousPlayer?:Point, previousHeight?:
     b.mode = 'charge'; b.timer = Math.max(1, Math.ceil(Math.hypot(b.targetX - b.x, b.targetY - b.y) / GATEKEEPER.chargeSpeed * 60));
   } else if (b.pattern === 'rocks') {
     for (const rock of b.rocks) if (distance(rock, s.player) <= GATEKEEPER.rockRadius && visible(rock, s.player, 0, roomLayout(s).walls)) hits.push({ damage: 16, cause: '문지기 석상의 낙석' });
+    for (const rock of b.rocks) blastStoneWall(s, rock, GATEKEEPER.rockRadius, 16);
     b.impactTicks = 12; recover(b);
   }
   return hits;

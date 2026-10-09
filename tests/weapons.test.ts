@@ -15,11 +15,11 @@ describe('weapon selection and volleys', () => {
     p.bossDefeated = true; expect(weaponUnlocked(p, 'W02')).toBe(true); p.selectedWeapon = 'W02'; expect(selectedWeapon(p)).toBe('W02');
     p.bossDefeated = false; expect(selectedWeapon(p)).toBe('W01');
   });
-  it('fires five unique pellets in one event with a symmetric 30 degree spread and 36 tick cadence', () => {
+  it('fires five unique pellets in one event with a symmetric 22 degree spread and 36 tick cadence', () => {
     const s = shotgun(); step(s, fire);
     expect(s.bullets).toHaveLength(5); expect(new Set(s.bullets.map(b => b.id)).size).toBe(5);
     expect(new Set(s.bullets.map(b => b.eventId)).size).toBe(1); expect(s.stats.shots).toBe(1);
-    s.bullets.forEach((b, i) => { expect(b.damage).toBe(2.5); expect(Math.hypot(b.vx, b.vy)).toBeCloseTo(280); expect(Math.atan2(b.vy, b.vx) * 180 / Math.PI).toBeCloseTo(-15 + i * 7.5); });
+    s.bullets.forEach((b, i) => { expect(b.damage).toBe(2.5); expect(Math.hypot(b.vx, b.vy)).toBeCloseTo(280); expect(Math.atan2(b.vy, b.vx) * 180 / Math.PI).toBeCloseTo(-11 + i * 5.5); });
     for (let t = 0; t < 35; t++) step(s, fire); expect(s.stats.shots).toBe(1);
     step(s, fire); expect(s.stats.shots).toBe(2);
   });

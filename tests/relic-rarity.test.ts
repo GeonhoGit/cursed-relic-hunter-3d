@@ -64,7 +64,7 @@ describe('relic rarity and weighted offers', () => {
       s.expedition!.room = 10; s.phase = 'explore'; refreshShop(s);
       const stock = s.expedition!.dungeon!.rooms[10].shop!;
       counts.shop[RELICS[stock.slots[0].relic!].rarity]++;
-      expect(stock.slots[2].kind).toBe('heal'); expect(stock.slots[3].relic).toBe('R43');
+      expect(stock.slots[2].kind).toBe('heal'); expect(isCurse(stock.slots[3].relic!)).toBe(true);
     }
     for (const group of Object.values(counts)) for (const [rarity, grade] of Object.entries(RELIC_RARITIES))
       expect(Math.abs(group[rarity as keyof typeof group] / samples - grade.weight / 100), JSON.stringify(counts)).toBeLessThan(0.025);

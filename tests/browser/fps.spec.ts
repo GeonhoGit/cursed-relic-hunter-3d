@@ -61,7 +61,8 @@ async function seed(page: Page, kind: string) {
         { kind: 'curse', relic: null, purchased: false, repairCounter: 0 },
       ] };
     }
-    const store = new saves.SaveStore('cursed-relic-hunter-3d-v1'); await store.load(); await store.save(s, saves.defaultSettings());
+    // Gameplay checks use the deterministic low tier; graphics tiers have dedicated tests.
+    const store = new saves.SaveStore('cursed-relic-hunter-3d-v1'); await store.load(); await store.save(s, { ...saves.defaultSettings(), graphicsQuality: 'low' });
   }, kind);
   await page.reload(); await page.getByRole('button', { name: '탐험 이어하기' }).click();
 }
@@ -74,8 +75,10 @@ async function saved(page: Page) {
 }
 async function saveHome(page: Page) {
   await page.keyboard.press('Escape'); await expect(page.getByRole('heading', { name: '잠시 숨을 고릅니다.' })).toBeVisible();
+  // Pump the paused mock clock so pending UI/save tasks can settle without combat ticks.
+  await expect.poll(async () => { await page.clock.fastForward(20); return page.locator('#save-status').textContent(); }).toBe('탐험 저장됨');
   await page.getByRole('button', { name: '저장하고 야영지로' }).click();
-  await expect(page.getByRole('button', { name: '탐험 이어하기' })).toBeVisible(); return (await saved(page)).run;
+  await expect.poll(async () => { await page.clock.fastForward(20); return page.getByRole('button', { name: '탐험 이어하기' }).isVisible(); }).toBe(true); return (await saved(page)).run;
 }
 async function capture(page: Page) {
   await expect.poll(() => page.evaluate(() => !!document.pointerLockElement)).toBe(true);
@@ -187,7 +190,7 @@ for (const key of ['ShiftLeft', 'ShiftRight']) {
     await page.getByRole('button', { name: '탐험 이어하기' }).click(); await capture(page);
     await page.keyboard.down('w'); await page.clock.runFor(80);
     await page.keyboard.press(key); await page.clock.runFor(300); await page.keyboard.up('w');
-    await expect(page.locator('.abilities kbd').first()).toHaveText('SHIFT');
+    await expect(page.locator('.abilities kbd').first()).toHaveText('Shift');
     const s = await saveHome(page);
     expect(s.stats.dodges).toBe(1); expect(s.player.y).toBeLessThan(125);
     expect(s.player.dodgeCooldown).toBeGreaterThan(0);
@@ -282,7 +285,7 @@ test('entering a treasure room only offers relics after opening its nearby chest
   await page.screenshot({ path: 'test-results/fps-treasure-chest.png' });
   await page.keyboard.press('e'); await expect(page.getByRole('heading', { name: '유물을 하나 선택하세요.' })).toBeVisible();
   await page.locator('button[data-action^="choose-R"]').first().click(); await expect(page.locator('#overlay')).toBeHidden(); await capture(page);
-  await expect(page.locator('#interact')).toBeHidden();
+  await expect.poll(async () => { await page.clock.runFor(20); return page.locator('#interact').isVisible(); }).toBe(false);
   const claimed = await saveHome(page); expect(claimed.expedition.acquired).toHaveLength(1);
   expect(claimed.expedition.dungeon.rooms[7].reward.choice).not.toBeNull();
 });

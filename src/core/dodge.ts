@@ -1,4 +1,4 @@
-import { unreflectableBullet, type Bullet, type RunState } from './model';
+import { unreflectableBullet, type Bullet, type Point, type RunState } from './model';
 import { hasRelic } from './relics';
 import { growthStats } from './growth';
 import { playerDamage } from './player-effects';
@@ -33,15 +33,16 @@ export function canParry(s: RunState) {
   const p = s.player, elapsed = 0.24 - p.dodgeRemaining;
   return hasRelic(s, 'R30') && p.dodgeRemaining > 0 && elapsed >= 0 && elapsed <= 0.1 + 1e-9 && !p.parryUsed;
 }
-export function parryProjectile(s: RunState, b: Bullet): boolean {
+export function parryProjectile(s: RunState, b: Bullet, playerPosition: Point = s.player): boolean {
   if (b.owner !== 'enemy' || unreflectableBullet(b) || !canParry(s)) return false;
   const p = s.player;
-  let dx = b.x - p.x, dy = b.y - p.y;
+  let dx = b.x - playerPosition.x, dy = b.y - playerPosition.y;
   if (Math.hypot(dx, dy) < 1e-9) { dx = -b.vx; dy = -b.vy; }
   const length = Math.hypot(dx, dy) * Math.hypot(p.dodgeX, p.dodgeY);
   if (!length || (dx * p.dodgeX + dy * p.dodgeY) / length < Math.SQRT1_2 - 1e-9) return false;
   p.parryUsed = true;
   delete b.source;
+  delete b.originalEnemyId; delete b.sourceRelicId;
   b.owner = 'player'; b.kind = 'reflected'; b.damage = playerDamage(s, 15); b.vx = -b.vx; b.vy = -b.vy;
   if (b.heightVelocity !== undefined) b.heightVelocity *= -1;
   return true;

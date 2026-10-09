@@ -18,7 +18,7 @@ describe('shop saves', () => {
     shop.slots[0].relic = 'R13'; shop.slots[1].relic = 'R25';
     await store.save(s, defaultSettings()); buyFromShop(s, 0, shop.revision);
     const expected = structuredClone(s), pending = store.save(s, defaultSettings()); s.gold = 99;
-    const saved = await pending; expect(saved.content).toBe('prototype-0.13'); expect(saved.run).toEqual(expected);
+    const saved = await pending; expect(saved.content).toBe('prototype-0.16'); expect(saved.run).toEqual(expected);
     const loaded = (await store.load())!.run!; expect(loaded).toEqual(expected);
     expect(buyFromShop(loaded, 0, currentRoom(loaded)!.shop!.revision)).toBe('unavailable'); expect(loaded.gold).toBe(16);
   });
@@ -34,7 +34,7 @@ describe('shop saves', () => {
     rooms[6].reward = { room: 6, candidates: [offered], choice: null }; chooseRelic(s, offered);
     expect(validRun(s)).toBe(true); const snapshot = structuredClone(rooms[10].shop);
     s.expedition!.room = 10; expect(refreshShop(s)).toBe(true); expect(rooms[10].shop).not.toEqual(snapshot);
-    buyFromShop(s, 3, rooms[10].shop!.revision);
+    rooms[10].shop!.slots[3].relic='R43';buyFromShop(s, 3, rooms[10].shop!.revision);
     s.expedition!.room = 9; rooms[9].visited = rooms[9].cleared = true; s.phase = 'cleared'; prepareReward(s);
     expect(chooseRelic(s, 'R43')).toBe(false); expect(validRun(s)).toBe(true);
     const store = new SaveStore('shop-altar'); await store.load(); await store.save(s, defaultSettings()); expect((await store.load())!.run).toEqual(s);
@@ -45,7 +45,7 @@ describe('shop saves', () => {
       s.expedition!.room = id; rooms[id].visited = rooms[id].cleared = true; s.phase = 'cleared';
       rooms[id].reward = { room: id, candidates: id === 9 ? ['R38', 'R43'] : [relic], choice: null }; chooseRelic(s, relic);
     }
-    s.expedition!.room = 10; refreshShop(s); expect(buyFromShop(s, 3, rooms[10].shop!.revision)).toBe('bought');
+    s.expedition!.room = 10; refreshShop(s);rooms[10].shop!.slots[3].relic='R38'; expect(buyFromShop(s, 3, rooms[10].shop!.revision)).toBe('bought');
     s.player.hp = 0; reviveContract(s); expect(validRun(s)).toBe(true);
     expect(rooms[10].shop!.slots[3]).toMatchObject({ relic: 'R38', purchased: true });
   });

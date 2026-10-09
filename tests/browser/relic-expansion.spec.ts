@@ -83,7 +83,14 @@ test('saved kill healing respects the room cap, stacks clear healing once and bu
   await page.reload(); await page.getByRole('button', { name: '탐험 이어하기' }).click();
   await expect(page.locator('#overlay')).toBeHidden(); await page.clock.runFor(50);
   await page.keyboard.press('e'); await page.locator('button[data-action="buy-2"]').click();
-  await expect(page.locator('#overlay')).toBeHidden(); await page.clock.runFor(50);
+  await expect(page.locator('#overlay')).toBeHidden();
+  const savedHp = await page.evaluate(async () => {
+    const { SaveStore } = await import('/src/persistence/save.ts' as string);
+    return (await new SaveStore('cursed-relic-hunter-3d-v1').load()).run.player.hp;
+  });
+  expect(savedHp).toBe(81);
+  // The imported renderer updates HUD at 10Hz; advance at least one full HUD interval.
+  await page.clock.runFor(120);
   await expect(page.locator('#hp')).toHaveText('81');
   await expect(page.locator('#weapon-stats')).toContainText('탄환당 피해 9.45 (+35%)');
   await expect(page.locator('#crown-status')).toHaveText('태양의 왕관 · 발동 중 +35%');

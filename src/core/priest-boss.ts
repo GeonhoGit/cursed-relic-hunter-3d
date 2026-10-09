@@ -1,6 +1,7 @@
 import { BOUNDS, DT, type Boss, type BossPattern, type RunState } from './model';
 import { distance, moveBody, nextWaypoint, segmentCircle, visible } from './geometry';
 import { roomLayout } from './room-layout';
+import { strikeStoneWall } from './masonry';
 import { advanceSilence } from './silence';
 
 export const PRIEST = { hp: 2600, chains: 60, ring: 54, ritual: 90, recovery: 72, transition: 60 } as const;
@@ -61,6 +62,7 @@ export function advancePriest(s: RunState): {damage:number;cause:string}[] {
       hits.push({damage:16,cause:'사슬의 사제의 사슬'});
     }
     b.impactTicks=18;
+    for (const chain of b.chains ?? []) strikeStoneWall(s, chain, { x: chain.tx, y: chain.ty }, 16, 7);
   } else if(b.pattern==='ring') {
     for(let i=0;i<10;i++) {
       if(i===b.ringGap || i===((b.ringGap??0)+1)%10) continue;

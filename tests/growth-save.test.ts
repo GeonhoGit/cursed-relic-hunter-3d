@@ -14,7 +14,7 @@ describe('growth persistence', () => {
     const first = await store.save(s, defaultSettings()); expect(earnedPoints(first.profile!)).toBe(5);
     for (const r of s.expedition!.dungeon!.rooms.filter(r => r.kind === 'combat')) r.visited = r.cleared = true;
     const a = store.save(s, defaultSettings()), b = store.save(old, defaultSettings()); await a; const latest = await b;
-    expect(latest.content).toBe('prototype-0.13'); expect(latest.profile!.rooms).toHaveLength(5); expect(earnedPoints(latest.profile!)).toBe(10);
+    expect(latest.content).toBe('prototype-0.16'); expect(latest.profile!.rooms).toHaveLength(5); expect(earnedPoints(latest.profile!)).toBe(10);
     expect((await store.save(old, defaultSettings())).profile).toEqual(latest.profile);
   });
   it('saves investment without changing the active run, then carries it to a new run and survives death', async () => {

@@ -37,7 +37,7 @@ describe('one free reroll per treasure chest', () => {
   });
   it('prioritizes a remaining new item, then fills from old eligible choices without duplicates', () => {
     const s = offer(), old = [...roomReward(s)!.candidates];
-    const fresh = RELIC_IDS.find(id => !isCurse(id) && !['R11', 'R12'].includes(id) && !old.includes(id))!;
+    const fresh = RELIC_IDS.find(id => !isCurse(id) && !['R11', 'R12','R28','R35','R36'].includes(id) && !old.includes(id))!;
     s.expedition!.acquired = RELIC_IDS.filter(id => !old.includes(id) && id !== fresh);
     expect(rerollReward(s)).toBe(true); expect(roomReward(s)!.candidates).toContain(fresh);
     expect(roomReward(s)!.candidates).toHaveLength(3); expect(new Set(roomReward(s)!.candidates).size).toBe(3);

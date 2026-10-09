@@ -14,8 +14,8 @@ export function spikeTraps(s: RunState): readonly Box[] {
   const traps = s.expedition?.region === 3
     ? LINES.map((b,i)=>Math.floor(Math.max(0,(s.trapTicks??0)-i*76)/258)%2 ? {...b,y:[310,64,32][i]} : b)
     : s.expedition?.region === 2 ? ZONES : [];
-  if (room.structure === undefined || s.expedition?.dungeon?.layoutVersion !== 1) return traps;
-  const placed: Box[] = [], obstacles = roomLayout(s).obstacles;
+  if (room.structure === undefined || !s.expedition?.dungeon?.layoutVersion) return traps;
+  const placed: Box[] = [], obstacles = [...roomLayout(s).obstacles,...(room.pits ?? [])];
   const fits = (box: Box) => ![...obstacles, ...placed].some(b => box.x < b.x + b.w + 3 && box.x + box.w > b.x - 3
     && box.y < b.y + b.h + 3 && box.y + box.h > b.y - 3);
   for (const original of traps) {

@@ -17,7 +17,7 @@ function encounter(template: number) {
 describe('room layout saves', () => {
   it.each([0, 1, 2])('restores layout %s and the same future', async template => {
     const s = encounter(template), store = new SaveStore(`layout-${template}`); await store.load();
-    const record = await store.save(s, defaultSettings()); expect(record.content).toBe('prototype-0.13');
+    const record = await store.save(s, defaultSettings()); expect(record.content).toBe('prototype-0.16');
     const restored = (await store.load())!.run!; expect(restored).toEqual(s);
     expect(roomLayout(restored).id).toBe(template);
     for (let t = 0; t < 120; t++) { step(s, emptyInput()); step(restored, emptyInput()); }

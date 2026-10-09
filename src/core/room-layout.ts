@@ -1,6 +1,7 @@
 import { ALTAR_PEDESTAL, TREASURE_PEDESTAL, SHOP_MERCHANT, SHOP_COUNTER, BOUNDARY_WALLS, PILLARS, type Box, type DungeonRoom, type RunState } from './model';
 import { currentRoom } from './dungeon';
 import { ROOM_STRUCTURES } from './room-structures';
+import { decoyBounds, SCARECROW } from './scarecrow';
 
 function layout(id: number, name: string, obstacles: Box[], floor: number[], stone: number, trim: number) {
   return { id, name, obstacles, walls: [...BOUNDARY_WALLS, ...obstacles], floor, stone, trim };
@@ -30,19 +31,23 @@ export const HEART_LAYOUTS = [
 
 function roomPalette(s: RunState): RoomLayout {
   const room = currentRoom(s);
-  if (s.expedition?.region === 3) return HEART_LAYOUTS[room && ['start', 'combat'].includes(room.kind) ? room.template : 0] ?? HEART_LAYOUTS[0];
-  if (s.expedition?.region === 2) return CURSED_LAYOUTS[room && ['start', 'combat'].includes(room.kind) ? room.template : 0] ?? CURSED_LAYOUTS[0];
+  if (s.expedition?.region === 3) return HEART_LAYOUTS[room && ['start', 'combat','elite'].includes(room.kind) ? room.template : 0] ?? HEART_LAYOUTS[0];
+  if (s.expedition?.region === 2) return CURSED_LAYOUTS[room && ['start', 'combat','elite'].includes(room.kind) ? room.template : 0] ?? CURSED_LAYOUTS[0];
   // Preserve the terrain of pre-0.13 saves, including live bullets and placed bombs.
-  return s.expedition?.dungeon?.layoutVersion === 1 && room && ['start', 'combat'].includes(room.kind)
+  return !!s.expedition?.dungeon?.layoutVersion && room && ['start', 'combat','elite'].includes(room.kind)
     ? ROOM_LAYOUTS[room.template] ?? ROOM_LAYOUTS[0] : ROOM_LAYOUTS[0];
 }
 
-export function roomLayout(s: RunState): RoomLayout {
+export function roomLayout(s: RunState, dynamic = true): RoomLayout {
   const palette = roomPalette(s), room = currentRoom(s);
-  const shape = s.expedition?.dungeon?.layoutVersion === 1 && room?.kind !== 'boss'
+  const shape = !!s.expedition?.dungeon?.layoutVersion && room?.kind !== 'boss'
     && room?.structure !== undefined ? ROOM_STRUCTURES[room.structure] : undefined;
-  return shape ? { ...palette, name: `${palette.name} · ${shape.name}`, obstacles: shape.obstacles,
+  const result = shape ? { ...palette, name: `${palette.name} · ${shape.name}`, obstacles: shape.obstacles,
     walls: [...BOUNDARY_WALLS, ...shape.obstacles] } : palette;
+  const withWall = dynamic && s.stoneWall ? { ...result, obstacles: [...result.obstacles, s.stoneWall], walls: [...result.walls, s.stoneWall] } : result;
+  if (!dynamic || !s.decoy) return withWall;
+  const decoy = { ...decoyBounds(s.decoy), decoyId: s.decoy.id };
+  return { ...withWall, obstacles: [...withWall.obstacles, decoy] };
 }
 
 const PROP_OBSTACLES: Partial<Record<DungeonRoom['kind'], Box[]>> = {
@@ -50,8 +55,12 @@ const PROP_OBSTACLES: Partial<Record<DungeonRoom['kind'], Box[]>> = {
   treasure: [TREASURE_PEDESTAL],
   shop: [SHOP_MERCHANT, SHOP_COUNTER],
 };
-export function bodyObstacles(s: RunState) {
+export function bodyObstacles(s: RunState, dynamic = true) {
   const room = currentRoom(s);
-  const obstacles = roomLayout(s).obstacles, props = room && PROP_OBSTACLES[room.kind];
+  const obstacles = roomLayout(s, dynamic).obstacles.filter(b => (b !== s.stoneWall || (s.player.height ?? 0) < 60)
+    && (!('decoyId' in b) || (s.player.height ?? 0) < SCARECROW.height)), props = room && PROP_OBSTACLES[room.kind];
   return props ? [...obstacles, ...props] : obstacles;
+}
+export function groundObstacles(s:RunState,dynamic=true){
+  return [...bodyObstacles({...s,player:{...s.player,height:0}},dynamic),...(currentRoom(s)?.pits ?? [])];
 }

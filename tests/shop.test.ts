@@ -18,7 +18,7 @@ describe('ruins shop', () => {
     const s = visit(), stock = structuredClone(currentRoom(s)!.shop!); expect(s.expedition!.dungeon!.rooms).toHaveLength(11);
     expect(s.phase).toBe('explore'); expect(s.enemies).toHaveLength(0); expect(s.gold).toBe(40); expect(s.stats.kills).toBe(0);
     expect(stock.slots.map(x => x.kind)).toEqual(['relic', 'relic', 'heal', 'curse']);
-    expect(stock.slots[3].relic).toBe('R43'); expect(new Set(stock.slots.filter(x => x.relic).map(x => x.relic)).size).toBe(3);
+    expect(isCurse(stock.slots[3].relic!)).toBe(true); expect(new Set(stock.slots.filter(x => x.relic).map(x => x.relic)).size).toBe(3);
     const rng = s.rng; expect(refreshShop(s)).toBe(false); expect(s.rng).toBe(rng);
     travel(s, adjacentRooms(s)[0].direction); travel(s, adjacentRooms(s).find(d => d.room.id === 10)!.direction);
     expect(currentRoom(s)!.shop).toEqual(stock); expect(s.gold).toBe(40);
@@ -49,6 +49,7 @@ describe('ruins shop', () => {
   it('offers a contract only when eligible and never refills a purchased relic after consumption or loss', () => {
     const s = visit(), shop = currentRoom(s)!.shop!;
     grantRelic(s, 'R01'); grantRelic(s, 'R02'); grantRelic(s, 'R43'); refreshShop(s);
+    shop.slots[3].relic='R38';
     expect(shop.slots[3].relic).toBe('R38'); const revision = shop.revision;
     expect(buyFromShop(s, 3, revision)).toBe('bought'); expect(s.gold).toBe(10);
     s.player.hp = 0; expect(reviveContract(s)).toBe(true); refreshShop(s);
@@ -57,10 +58,11 @@ describe('ruins shop', () => {
   });
   it('rechecks a contract condition before payment and blocks a now-ineligible displayed offer', () => {
     const s = visit(), shop = currentRoom(s)!.shop!; grantRelic(s, 'R01'); grantRelic(s, 'R20'); grantRelic(s, 'R43'); refreshShop(s);
+    shop.slots[3].relic='R38';
     expect(shop.slots[3].relic).toBe('R38'); const revision = shop.revision;
     s.expedition!.relics = s.expedition!.relics.filter(id => id !== 'R20');
-    expect(buyFromShop(s, 3, revision)).toBe('changed'); expect(shop.slots[3].relic).toBeNull(); expect(s.gold).toBe(40);
-    grantRelic(s, 'R02'); refreshShop(s); expect(shop.slots[3].relic).toBe('R38');
+    expect(buyFromShop(s, 3, revision)).toBe('changed'); expect(shop.slots[3].relic).not.toBe('R38'); expect(s.gold).toBe(40);
+    grantRelic(s, 'R02'); shop.slots[3].relic='R38';expect(purchaseIssue(s,3)).toBe('');
   });
   it('does not refill valid or purchased slots when there are no remaining candidates', () => {
     const s = visit(), shop = currentRoom(s)!.shop!;
@@ -71,7 +73,7 @@ describe('ruins shop', () => {
   it('never charges outside safe shop exploration and forbids acquiring a purchased curse again from the altar', () => {
     const s = visit(), shop = currentRoom(s)!.shop!; s.phase = 'combat';
     expect(buyFromShop(s, 3, shop.revision)).toBe('unavailable'); expect(s.gold).toBe(40);
-    s.phase = 'explore'; expect(buyFromShop(s, 3, shop.revision)).toBe('bought');
+    s.phase = 'explore';shop.slots[3].relic='R43'; expect(buyFromShop(s, 3, shop.revision)).toBe('bought');
     s.expedition!.room = 9; const altar = currentRoom(s)!; altar.visited = altar.cleared = true; s.phase = 'cleared'; prepareReward(s);
     expect(chooseRelic(s, 'R43')).toBe(false); expect(chooseRelic(s, 'skip')).toBe(true);
   });

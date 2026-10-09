@@ -1,6 +1,8 @@
 import { BOUNDS, PILLARS, type Boss, type BossPattern, type Point, type RunState } from './model';
 import { roomLayout } from './room-layout';
 import { segmentBox, visible } from './geometry';
+import { clearRelicFields } from './relic-fields';
+import { blastStoneWall, strikeStoneWall } from './masonry';
 
 export const HEART = { hp:3600, pillarHp:100, relink:480, transition:60, recovery:60,
   pulse:48, laser:72, shockwave:60, bulletSpeed:150, waveTicks:72, waveStride:8, waveHalfWidth:6, waveHeight:16 } as const;
@@ -23,6 +25,7 @@ export function startHeartPattern(s:RunState, pattern:BossPattern) {
 function prepare(s:RunState, link:boolean) {
   const b=s.boss!;b.mode='transition';b.timer=HEART.transition;b.transitionTick=s.tick;b.impactTicks=0;
   b.rocks=[];delete b.shockRadius;delete b.shockHit;s.bullets=[];
+  clearRelicFields(s);
   if(link) { b.pillarIndex=b.shieldLinks ?? 0;b.pillarHp=HEART.pillarHp;b.shieldLinks=(b.shieldLinks??0)+1;delete b.relinkTicks; }
 }
 export function checkHeartTransition(s:RunState) {
@@ -47,9 +50,9 @@ export function heartLaserEnd(s:RunState):Point {
 function recover(b:Boss){b.mode='recover';b.timer=HEART.recovery;}
 // Partition a swept player segment at its intersections with the expanding ring.
 // This handles dashes crossing both edges as well as vertical jump/landing paths.
-function sweptWave(s:RunState,before:Point,height:number,oldRadius:number,radius:number):boolean {
+export function sweptWave(s:RunState,before:Point,height:number,oldRadius:number,radius:number,bodyRadius=7):boolean {
   const b=s.boss!,p=s.player,dx=p.x-before.x,dy=p.y-before.y,x=before.x-b.x,y=before.y-b.y,dr=radius-oldRadius;
-  const cuts=[0,1], half=HEART.waveHalfWidth+7;
+  const cuts=[0,1], half=HEART.waveHalfWidth+bodyRadius;
   for(const sign of [-1,1]) {
     const r=oldRadius+sign*half,A=dx*dx+dy*dy-dr*dr,B=2*(x*dx+y*dy-r*dr),C=x*x+y*y-r*r;
     const roots=Math.abs(A)<1e-9 ? Math.abs(B)<1e-9?[]:[-C/B] : B*B-4*A*C<0?[]:[(-B-Math.sqrt(B*B-4*A*C))/(2*A),(-B+Math.sqrt(B*B-4*A*C))/(2*A)];
@@ -76,7 +79,12 @@ export function advanceHeart(s:RunState,before:Point=s.player,height=s.player.he
   if(b.mode==='wave') {
     const old=b.shockRadius??0;b.shockRadius=old+HEART.waveStride;
     if(!b.shockHit&&sweptWave(s,before,height,old,b.shockRadius)){b.shockHit=true;hits.push({damage:18,cause:'유물 심장의 충격파'});}
-    if(--b.timer<=0){delete b.shockRadius;delete b.shockHit;recover(b);}return hits;
+    if (s.stoneWall) {
+      const wall = s.stoneWall, dx = Math.max(wall.x - b.x, 0, b.x - wall.x - wall.w), dy = Math.max(wall.y - b.y, 0, b.y - wall.y - wall.h);
+      const near = Math.hypot(dx, dy) - HEART.waveHalfWidth;
+      if ((old === 0 && near <= 0) || near > old && near <= b.shockRadius) blastStoneWall(s, b, b.shockRadius + HEART.waveHalfWidth, 18);
+    }
+    if(--b.timer<=0){delete b.shockRadius;delete b.shockHit;delete b.allyShockHit;delete b.decoyShockHit;recover(b);}return hits;
   }
   if(--b.timer>0)return hits;
   if(b.mode==='recover') {
@@ -91,7 +99,8 @@ export function advanceHeart(s:RunState,before:Point=s.player,height=s.player.he
     const local=(p:Point)=>({x:(p.x-b.x)*c+(p.y-b.y)*sn,y:-(p.x-b.x)*sn+(p.y-b.y)*c});
     const a=local(before),z=local(s.player);
     if(segmentBox(a.x,a.y,z.x,z.y,{x:0,y:-6,w:length,h:12},7)!==null)hits.push({damage:22,cause:'유물 심장의 레이저'});
+    strikeStoneWall(s, b, { x: b.x + c * 1000, y: b.y + sn * 1000 }, 22);
     b.impactTicks=12;recover(b);
-  } else { b.mode='wave';b.timer=HEART.waveTicks;b.shockRadius=0;b.shockHit=false; }
+  } else { b.mode='wave';b.timer=HEART.waveTicks;b.shockRadius=0;b.shockHit=false;delete b.allyShockHit;delete b.decoyShockHit; }
   return hits;
 }

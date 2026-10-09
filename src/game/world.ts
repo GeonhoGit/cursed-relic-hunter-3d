@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { adjacentRooms, currentRoom, DIRECTIONS } from '../core/dungeon';
+import { adjacentRooms, currentRoom, DIRECTIONS, revealedRoomKind } from '../core/dungeon';
 import { roomLayout } from '../core/room-layout';
 import { BOUNDS, ALTAR_PEDESTAL, TREASURE_PEDESTAL, SHOP_COUNTER, SHOP_MERCHANT, isBoss, type Box, type RunState, type Enemy, type Boss } from '../core/model';
 import { spikeTraps, trapStage } from '../core/traps';
 import { BODY_HEIGHT, EYE_HEIGHT, CEILING_HEIGHT, playerEyeHeight } from '../core/fps-geometry';
-import { ENEMY_ATTACK } from '../core/enemy-balance';
+import { ENEMY_ATTACK,ENEMY_NAMES } from '../core/enemy-balance';
 import { shieldHealth } from '../core/enemy-special';
 import { BOMB } from '../core/bombs';
 import { TIME } from '../core/time-debt';
@@ -25,10 +25,22 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SCALE, wx, wz } from './world-space';
 import { bevel, box, dispose, label, material, orb, ring, spikeField } from './scene-primitives';
 import { figure } from './enemy-models';
+import { paintRelicEffects } from './relic-effects';
+import { paintRelicFields } from './field-effects';
+import { paintRemainingEffects } from './remaining-effects';
+import { paintMasonry } from './masonry-effects';
+import { paintPuppet } from './puppet-effects';
+import { paintScarecrow } from './scarecrow-effects';
+import { paintAnchor } from './anchor-effects';
+import { paintEvacuation } from './evacuation-effects';
+import { isAlly } from '../core/allegiance';
+import { eliteCooldown } from '../core/elite';
+import {releaseGeometry,withRenderResources} from './render-resources';
+import {createEffectWarmup} from './effect-warmup';
 
 export { SCALE } from './world-space';
 
-const DOOR_COLOR = { start: 0x92c8b3, combat: 0x83caba, treasure: 0xe4bf6e, boss: 0xe48b63, altar: 0xbfa1d5, shop: 0xe4bf6e };
+const DOOR_COLOR = { start: 0x92c8b3, combat: 0x83caba, elite:0xf2b85d, treasure: 0xe4bf6e, boss: 0xe48b63, altar: 0xbfa1d5, shop: 0xe4bf6e, unknown: 0x90aaa0 };
 const ATMOSPHERE = [
   { fog: 0x122326, sky: 0xb3d2cc, ground: 0x393c30, key: 0xffdfb4, torch: 0xffbd79 },
   { fog: 0x211a2c, sky: 0xc6b7db, ground: 0x3d3038, key: 0xe8c8e1, torch: 0xffa482 },
@@ -58,6 +70,8 @@ export class World {
   private keyLight = new THREE.DirectionalLight(0xffe2ba, 1.7);
   private reflectionTarget?: THREE.WebGLRenderTarget;
   private graphicsLevel: GraphicsLevel = 3;
+  private effectWarmup=createEffectWarmup();
+  private effectWarmLevel:GraphicsLevel|undefined;
   get ready() { return this.worldReady; }
   constructor(host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -67,6 +81,7 @@ export class World {
     this.renderer.domElement.setAttribute('aria-label', '3D 1인칭 유적 탐험 화면'); host.append(this.renderer.domElement);
     this.scene.background = new THREE.Color(0x0e191b); this.scene.fog = new THREE.FogExp2(0x0e191b, 0.017);
     this.scene.add(this.room, this.camera, this.ambient);
+    this.camera.add(this.effectWarmup);
     const weaponLight = new THREE.DirectionalLight(0xffe2ba, 1.7);
     weaponLight.position.set(-4, 10, 3);
     this.weaponScene.add(this.weaponCamera, new THREE.HemisphereLight(0xb6d1ca, 0x353628, .95), weaponLight);
@@ -178,15 +193,25 @@ export class World {
     for (const g of this.entities.values()) { this.scene.remove(g); dispose(g); }
     this.entities.clear();
     dispose(this.room); this.doors = []; this.relic = undefined; this.chestLid = undefined; this.flames = []; this.torchLights = []; this.dust = undefined;
-    const layout = roomLayout(s), color = [0x657b7c,0x8e795b,0x657b65,0x70617d,0x807069,0x586979,0x80617b,0x586f8c,0x875765][layout.id];
+    const layout = roomLayout(s, false), color = [0x657b7c,0x8e795b,0x657b65,0x70617d,0x807069,0x586979,0x80617b,0x586f8c,0x875765][layout.id];
     const atmosphere = ATMOSPHERE[(s.expedition?.region ?? 1) - 1];
     (this.scene.background as THREE.Color).setHex(atmosphere.fog);
     (this.scene.fog as THREE.FogExp2).color.setHex(atmosphere.fog);
     this.ambient.color.setHex(atmosphere.sky); this.ambient.groundColor.setHex(atmosphere.ground);
     this.keyLight.color.setHex(atmosphere.key);
     const width = BOUNDS.w * SCALE, depth = BOUNDS.h * SCALE, height = CEILING_HEIGHT * SCALE;
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), stoneMaterial(color, 'floor', width / 4, depth / 4));
-    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; this.room.add(floor);
+    const pits=currentRoom(s)?.pits ?? [],xs=[-width/2,...pits.flatMap(p=>[wx(p.x),wx(p.x+p.w)]),width/2].sort((a,b)=>a-b),zs=[-depth/2,...pits.flatMap(p=>[wz(p.y),wz(p.y+p.h)]),depth/2].sort((a,b)=>a-b);
+    for(let xi=0;xi<xs.length-1;xi++)for(let zi=0;zi<zs.length-1;zi++){
+      const x=(xs[xi]+xs[xi+1])/2,z=(zs[zi]+zs[zi+1])/2;
+      if(pits.some(p=>x>wx(p.x)&&x<wx(p.x+p.w)&&z>wz(p.y)&&z<wz(p.y+p.h)))continue;
+      const w=xs[xi+1]-xs[xi],d=zs[zi+1]-zs[zi],floor=new THREE.Mesh(new THREE.PlaneGeometry(w,d),stoneMaterial(color,'floor',w/4,d/4));
+      floor.rotation.x=-Math.PI/2;floor.position.set(x,0,z);floor.receiveShadow=true;floor.name='ground-floor';this.room.add(floor);
+    }
+    for(const p of pits){const g=new THREE.Group();g.name='pit-shaft';g.position.set(wx(p.x+p.w/2),0,wz(p.y+p.h/2));this.room.add(g);
+      box(g,p.w*SCALE,0.05,p.h*SCALE,0,-2,0,0x080b10);
+      for(const sign of [-1,1]){box(g,.08,2,p.h*SCALE,sign*p.w*SCALE/2,-1,0,layout.stone);box(g,p.w*SCALE,2,.08,0,-1,sign*p.h*SCALE/2,layout.stone);
+        box(g,.08,.035,p.h*SCALE,sign*p.w*SCALE/2,.018,0,layout.trim);box(g,p.w*SCALE,.035,.08,0,.018,sign*p.h*SCALE/2,layout.trim);}
+    }
     // Keep the underside aligned with projectile collision, overlapping the wall tops.
     const ceiling = box(this.room, width + 0.8, 0.3, depth + 0.8, 0, height + 0.15, 0, color);
     ceiling.name = 'stone-roof'; ceiling.material.dispose();
@@ -205,7 +230,7 @@ export class World {
       rib.castShadow = rib.receiveShadow = false;
       rib.material.polygonOffset = true; rib.material.polygonOffsetFactor = -2; rib.material.polygonOffsetUnits = -2;
     }
-    const connections = adjacentRooms(s), doorTypes = new Map(connections.map(d => [d.direction, d.room.kind]));
+    const connections = adjacentRooms(s), doorTypes = new Map(connections.map(d => [d.direction, revealedRoomKind(s, d.room)]));
     const sides = [
       { direction: 'north' as const, length: width + 0.72, x: 0, z: -depth / 2 - 0.18, rotation: 0 },
       { direction: 'south' as const, length: width + 0.72, x: 0, z: depth / 2 + 0.18, rotation: 0 },
@@ -230,6 +255,7 @@ export class World {
         }
         box(g, 2.42, 0.23, 0.6, 0, 3.33, 0, 0x8e9787);
         const panel = box(g, 1.92, 3.2, 0.1, 0, 1.6, 0, 0x324743); panel.name = side.direction; this.doors.push(panel);
+        panel.userData.roomKind = type;
         panel.material.metalness = .6; panel.material.roughness = .4;
         for (const sign of [-1, 1]) {
           bevel(panel, .045, 2.9, .04, sign * .78, 0, .07, layout.trim, true);
@@ -239,7 +265,7 @@ export class World {
           }
         }
         box(g, 2.06, 0.01, 1.3, 0, 0.015, 0, DOOR_COLOR[type], DOOR_COLOR[type]);
-        label(g, { start: s.expedition?.region===3?'심장부의 문턱':s.expedition?.region===2?'회랑의 문턱':'길잡이의 방', combat: '전투 석실', treasure: '유물의 안식처', boss: s.expedition?.region===3?'심장의 성소':s.expedition?.region===2?'사슬의 성소':'문지기의 봉인', altar: '저주받은 제단', shop: '방랑 상인' }[type], 0, 3.83, side.direction === 'north' || side.direction === 'west' ? 0.45 : -0.45, DOOR_COLOR[type]);
+        label(g, { start: s.expedition?.region===3?'심장부의 문턱':s.expedition?.region===2?'회랑의 문턱':'길잡이의 방', combat: '전투 석실', elite:'정예 석실 · 고위험 보상', treasure: '유물의 안식처', boss: s.expedition?.region===3?'심장의 성소':s.expedition?.region===2?'사슬의 성소':'문지기의 봉인', altar: '저주받은 제단', shop: '방랑 상인', unknown: '미확인 석실' }[type], 0, 3.83, side.direction === 'north' || side.direction === 'west' ? 0.45 : -0.45, DOOR_COLOR[type]);
       }
       for (let level = 1; level < 5; level++) {
         if (gap) for (const sign of [-1, 1]) box(g, (side.length - gap) / 2, 0.025, 0.38, sign * (side.length + gap) / 4, level * 1.1, 0, 0x425451);
@@ -342,7 +368,7 @@ export class World {
         this.chestLid = lid;
       }
       this.relic = orb(this.room, 0.25, 0, 1.7, 0, kind === 'altar' ? 0xd0b2ef : 0xf1d78c, kind === 'altar' ? 0x9b63bc : 0xcbad54);
-      this.relic.geometry.dispose(); this.relic.geometry = new THREE.OctahedronGeometry(0.27);
+      releaseGeometry(this.relic.geometry); this.relic.geometry = new THREE.OctahedronGeometry(0.27);
       const light = new THREE.PointLight(kind === 'altar' ? 0xce9df1 : 0xffd18e, 8, 4, 2); light.position.set(0, 1.8, 0); this.room.add(light);
     }
     if (kind === 'shop') {
@@ -365,8 +391,12 @@ export class World {
     mesh.rotation.y = -Math.atan2(ty - y, tx - x); mesh.material.transparent = true; mesh.material.opacity = 0.65; mesh.castShadow = false;
   }
   paint(s: RunState, yaw: number, pitch: number, moving: boolean, paused: boolean, visual: { reducedMotion?: boolean; motion?: MotionFrame } = {}) {
+    return withRenderResources(()=>{try{return this.paintFrame(s,yaw,pitch,moving,paused,visual);}finally{this.effectWarmup.visible=false;}});
+  }
+  private paintFrame(s: RunState, yaw: number, pitch: number, moving: boolean, paused: boolean, visual: { reducedMotion?: boolean; motion?: MotionFrame } = {}) {
     if (!this.worldReady) return;
-    const key = `${s.seed}:${s.expedition?.region}:${s.expedition?.room}:${roomLayout(s).id}:${currentRoom(s)?.structure ?? 'legacy'}`;
+    const key = `${s.seed}:${s.expedition?.region}:${s.expedition?.room}:${roomLayout(s).id}:${currentRoom(s)?.structure ?? 'legacy'}:${s.expedition?.relics.includes('R31')}:${s.expedition?.relics.includes('R48')}:${adjacentRooms(s).map(d => `${Number(d.room.visited)}${Number(d.room.locked)}`).join('')}`;
+    this.effectWarmup.visible=key!==this.roomKey||this.effectWarmLevel!==this.graphicsLevel;this.effectWarmLevel=this.graphicsLevel;
     if (key !== this.roomKey) { this.roomKey = key; this.buildRoom(s); }
     const reduced = !!visual.reducedMotion, p = s.player, pose = visual.motion?.player ?? p;
     const bob = !reduced && !paused && moving && !p.dodgeRemaining && !(p.height ?? 0) ? Math.sin(s.tick * 0.13) * 0.018 : 0;
@@ -386,7 +416,7 @@ export class World {
     this.muzzle.position.z = s.weapon === 'W03' ? -.75 : -.91;
     this.muzzle.visible = s.weapon !== 'W04' && fired;
     this.staffFlash.visible = s.weapon === 'W04' && fired;
-    for (const door of this.doors) door.visible = s.phase !== 'explore';
+    for (const door of this.doors){const locked=adjacentRooms(s).some(d=>d.direction===door.name&&d.room.locked);door.visible=s.phase!=='explore'||locked;if(locked&&door.material instanceof THREE.MeshStandardMaterial)door.material.color.setHex(0x5b435b);}
     const reward = currentRoom(s)?.reward;
     if (this.chestLid) this.chestLid.rotation.x = reward ? -1.15 : 0;
     if (this.relic) { this.relic.visible = this.chestLid ? !!reward && reward.choice === null : reward?.choice == null; this.relic.rotation.y = s.tick * 0.015; this.relic.position.y = 1.7 + Math.sin(s.tick * 0.025) * 0.08; }
@@ -399,6 +429,10 @@ export class World {
     if (this.dust) { this.dust.visible = !reduced && this.graphicsLevel >= 2; this.dust.position.y = Math.sin(s.tick * 0.003) * 0.06; }
     for (const e of [...s.enemies, ...(s.boss && s.boss.hp > 0 ? [s.boss] : [])]) {
       const g = this.object(`enemy-${e.id}`, () => figure(e.kind), present);
+      const pending=s.expedition?.dungeon?.layoutVersion===3&&!isBoss(e)&&(e.spawnTicks ?? 0)>0;
+      g.visible=!pending;
+      if(pending){const marker=this.object(`wave-spawn-${e.id}`,()=>{const group=new THREE.Group();ring(group,.65,0xc4e9cf);ring(group,.4,0x8eb9a3);return group;},present);marker.position.set(wx(e.x),.025,wz(e.y));marker.scale.setScalar(.7+.3*(1-(e.spawnTicks ?? 0)/48));continue;}
+      if(!isBoss(e)&&e.elite){const halo=this.object(`elite-mark-${e.id}`,()=>{const group=new THREE.Group();ring(group,.72,0xf4c778);label(group,`정예 ${ENEMY_NAMES[e.kind]}`,0,BODY_HEIGHT[e.kind]*SCALE+.35,0,0xf4c778);return group;},present);halo.position.set(wx(e.x),.03,wz(e.y));}
       const pose = visual.motion?.enemies.get(e.id) ?? e;
       g.position.set(wx(pose.x), 0, wz(pose.y)); g.rotation.y = Math.PI / 2 - pose.angle;
       if (e.kind === 'rat') g.position.y = !paused && e.mode === 'move' ? Math.abs(Math.sin(s.tick * 0.3 + e.id)) * 0.035 : 0;
@@ -409,15 +443,16 @@ export class World {
       if (e.kind === 'chainhound') {
         const jaw = g.getObjectByName('hound-jaw')!;
         jaw.rotation.x = e.mode === 'windup' ? .15 + .25 * (1 - e.timer / ENEMY_ATTACK.chainhound.windupTicks)
-          : e.mode === 'recover' && e.timer >= ENEMY_ATTACK.chainhound.cooldownTicks - ENEMY_ATTACK.chainhound.recoveryTicks ? .28 : 0;
+          : e.mode === 'recover' && e.timer >= eliteCooldown(e,ENEMY_ATTACK.chainhound.cooldownTicks) - ENEMY_ATTACK.chainhound.recoveryTicks ? .28 : 0;
       }
       if (e.kind === 'readerstatue') {
         const focus = g.getObjectByName('reader-focus')!;
         focus.visible = e.mode === 'windup' || !!e.laserTicks;
         focus.scale.setScalar(e.mode === 'windup' ? .6 + .4 * (1 - e.timer / ENEMY_ATTACK.readerstatue.windupTicks) : 1.3);
       }
-      const health = g.getObjectByName('health')!; health.lookAt(this.camera.position); health.visible = e.hp < e.maxHp || isBoss(e);
+      const health = g.getObjectByName('health')!; health.lookAt(this.camera.position); health.visible = e.hp < e.maxHp || isBoss(e) || isAlly(e);
       const fill = health.getObjectByName('fill')!; fill.scale.x = e.hp / e.maxHp;
+      paintPuppet(e, pose, g, (key, create) => this.object(key, create, present));
       const shield = g.getObjectByName('shield'); if (shield) shield.visible = shieldHealth(e as Enemy) > 0 && !(e as Enemy).shieldDisabledTicks;
       if (e.kind === 'sealcaster') {
         const focus = g.getObjectByName('seal-focus')!; focus.visible = e.mode === 'windup';
@@ -432,7 +467,7 @@ export class World {
           sword.rotation.x = -.3;
         } else {
           const duration = e.comboStrike === 2 ? attack.comboPauseTicks : attack.recoveryTicks;
-          const remaining = e.comboStrike === 2 ? e.timer : e.timer - (attack.cooldownTicks - duration);
+          const remaining = e.comboStrike === 2 ? e.timer : e.timer - (eliteCooldown(e,attack.cooldownTicks) - duration);
           sword.rotation.z = e.mode === 'recover' ? .9 * Math.max(0, remaining / duration) : -.12;
           sword.rotation.x = 0;
         }
@@ -496,7 +531,7 @@ export class World {
       g.position.set(wx(b.x+b.w/2),0,wz(b.y+b.h/2));
     });
     for (const b of s.bullets) {
-      const color = b.owner === 'enemy' ? b.source === 'riftshaman' ? 0xd09cef : 0xffac62 : b.kind === 'reflected' ? 0xd4ffcc : s.expedition?.relics.includes('R08') ? 0xb2efff : s.expedition?.relics.includes('R05') ? 0xffd98a : s.weapon === 'W04' && !b.kind ? 0xcdabf5 : 0x9ef5d4;
+      const color = b.owner === 'enemy' ? b.source === 'riftshaman' ? 0xd09cef : 0xffac62 : b.kind === 'ally' ? 0x83e4bd : b.kind === 'reflected' ? 0xd4ffcc : b.kind === 'orbit' ? 0xf6ce8b : s.expedition?.relics.includes('R08') ? 0xb2efff : s.expedition?.relics.includes('R05') ? 0xffd98a : s.weapon === 'W04' && !b.kind ? 0xcdabf5 : 0x9ef5d4;
       const bolt=s.weapon==='W03' && b.owner==='player' && !b.kind;
       const g = this.object(`bullet-${b.id}`, () => { const g = new THREE.Group(); if(bolt) bevel(g,0.025,0.025,0.22,0,0,0,color,color); else orb(g, 0.062, 0, 0, 0, color, color); return g; }, present);
       if(bolt) g.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),new THREE.Vector3(b.vx,b.heightVelocity??0,b.vy).normalize());
@@ -514,16 +549,23 @@ export class World {
     for (const c of s.cues) if (c.kind === 'stomp' && s.tick - c.tick < 20) {
       const age = (s.tick - c.tick) / 20;
       const g = this.object(`cue-${c.id}`, () => {
-        const g = new THREE.Group(); ring(g, c.amount * SCALE, 0xe5ce91); ring(g, c.amount * SCALE * 0.65, 0xb6ebcb); return g;
+        const g = new THREE.Group(); ring(g, c.amount * SCALE, c.ally ? 0x83e4bd : 0xe5ce91); ring(g, c.amount * SCALE * 0.65, 0xb6ebcb); return g;
       }, present);
       g.position.set(wx(c.x), 0, wz(c.y)); g.scale.setScalar(0.25 + age * 0.75);
       g.traverse(o => { if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshBasicMaterial) o.material.opacity = (1 - age) * 0.8; });
     }
     for (const c of s.cues) if (!reduced && ['kill', 'hit', 'blast', 'parry'].includes(c.kind) && s.tick - c.tick < 20) {
       const age = (s.tick - c.tick) / 20;
-      const g = this.object(`cue-${c.id}`, () => { const g = new THREE.Group(); for (let i = 0; i < 5; i++) orb(g, 0.035, Math.cos(i * 1.256) * 0.3, i % 2 * 0.2, Math.sin(i * 1.256) * 0.3, c.kind === 'blast' ? 0xffa760 : 0xbde9c0, 0x629978); return g; }, present);
+      const g = this.object(`cue-${c.id}`, () => { const g = new THREE.Group(); for (let i = 0; i < 5; i++) orb(g, 0.035, Math.cos(i * 1.256) * 0.3, i % 2 * 0.2, Math.sin(i * 1.256) * 0.3, c.ally ? 0x83e4bd : c.kind === 'blast' ? 0xffa760 : 0xbde9c0, 0x629978); return g; }, present);
       g.position.set(wx(c.x), 0.55 + age * 0.45, wz(c.y)); g.scale.setScalar(1 + age * (c.kind === 'blast' ? 10 : 2));
     }
+    paintRelicEffects(s, reduced, (key, create) => this.object(key, create, present));
+    paintRelicFields(s, reduced, (key, create) => this.object(key, create, present));
+    paintRemainingEffects(s,reduced,(key,create)=>this.object(key,create,present));
+    paintMasonry(s, (key, create) => this.object(key, create, present), this.camera);
+    paintScarecrow(s, (key, create) => this.object(key, create, present), this.camera);
+    paintAnchor(s, (key, create) => this.object(key, create, present));
+    paintEvacuation(s, (key, create) => this.object(key, create, present));
     for (const [key, g] of this.entities) if (!present.has(key)) { this.scene.remove(g); dispose(g); this.entities.delete(key); }
     if (this.bloom.enabled) this.composer.render();
     else {
@@ -553,7 +595,7 @@ export class World {
     }
     if(e.mode==='wave' && e.shockRadius!==undefined) {
       const wave=this.object(`heart-wave-${e.id}`,()=>{const group=new THREE.Group();const m=new THREE.Mesh(new THREE.RingGeometry(.01,.2,64),new THREE.MeshBasicMaterial({color:0xf298aa,transparent:true,opacity:.8,side:THREE.DoubleSide}));m.rotation.x=-Math.PI/2;m.position.y=.05;group.add(m);return group;},present);
-      const m=wave.children[0] as THREE.Mesh;if(wave.userData.radius!==e.shockRadius){m.geometry.dispose();m.geometry=new THREE.RingGeometry(Math.max(.01,e.shockRadius-HEART.waveHalfWidth)*SCALE,(e.shockRadius+HEART.waveHalfWidth)*SCALE,64);wave.userData.radius=e.shockRadius;}
+      const m=wave.children[0] as THREE.Mesh;if(wave.userData.radius!==e.shockRadius){releaseGeometry(m.geometry);m.geometry=new THREE.RingGeometry(Math.max(.01,e.shockRadius-HEART.waveHalfWidth)*SCALE,(e.shockRadius+HEART.waveHalfWidth)*SCALE,64);wave.userData.radius=e.shockRadius;}
       wave.position.set(wx(e.x),0,wz(e.y));
     }
   }
@@ -563,7 +605,7 @@ export class World {
       && !(isBoss(e) && (e.pattern==='chains'||e.pattern==='laser') && e.impactTicks>0)
       && !(e.kind === 'readerstatue' && e.laserTicks)) return;
     const pattern = isBoss(e) ? e.pattern : e.kind;
-    const key = `tell-${e.id}-${pattern}-${e.mode}-${e.targetX}-${e.targetY}${e.kind === 'heartguard' ? `-${e.comboStrike}` : e.kind === 'voidknight' ? e.blinkTarget ? '-blink' : '-slash' : e.kind === 'riftshaman' ? e.summonPoints ? '-summon' : '-seal' : ''}`;
+    const key = `tell-${e.id}-${pattern}-${e.mode}-${e.targetX}-${e.targetY}${e.kind === 'heartguard' ? `-${e.comboStrike}` : e.kind === 'voidknight' ? e.blinkTarget ? '-blink' : '-slash' : e.kind === 'riftshaman' ? e.summonPoints ? '-summon' : '-seal' : ''}:${isAlly(e) ? 'ally' : 'enemy'}`;
     const tell = this.object(key, () => {
       const g = new THREE.Group();
       g.userData.origin = { x: e.x, y: e.y };
@@ -679,6 +721,11 @@ export class World {
       return g;
     }, present);
     if (pattern === 'fan' || e.mode === 'shield') tell.position.set((e.x - tell.userData.origin.x) * SCALE, 0, (e.y - tell.userData.origin.y) * SCALE);
+    if (isAlly(e)) tell.traverse(o => {
+      if (o instanceof THREE.Mesh) for (const mat of Array.isArray(o.material) ? o.material : [o.material]) {
+        if (mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshStandardMaterial) mat.color.setHex(0x83e4bd);
+      }
+    });
     if (pattern === 'sealcaster') tell.getObjectByName('seal-charge')?.scale.setScalar(Math.max(.02, 1 - e.timer / ENEMY_ATTACK.sealcaster.windupTicks));
     tell.visible = e.mode !== 'charge';
   }

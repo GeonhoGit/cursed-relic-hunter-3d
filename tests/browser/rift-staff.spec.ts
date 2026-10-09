@@ -16,7 +16,7 @@ test('staff is locked in a fresh camp, unlocks after the heart victory and prese
   });
   await click('출발 무기'); await expect(page.locator('.weapon-card')).toHaveCount(4);
   const staff = page.locator('[data-weapon="W04"]'); await expect(staff).toContainText('유물 심장 첫 처치 시 해금');
-  await expect(staff).toContainText('9'); await expect(staff).toContainText('0.700초');
+  await expect(staff.locator('dd').first()).toHaveText('12'); await expect(staff).toContainText('0.700초');
   await expect(page.getByRole('button', { name: '균열 지팡이 선택' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '산탄 성물 선택' })).toBeDisabled();
   await expect(page.getByRole('button', { name: '관측자의 쇠뇌 선택' })).toBeDisabled();
@@ -97,7 +97,7 @@ test('staff crystal, spell and flash render distinctly and repeated weapon chang
       run.weapon = id; run.cues = []; run.bullets = []; run.player.fireCooldown = 0;
       world.paint(run, -Math.PI / 2, 0, false, false);
       await new Promise<void>(resolve => {
-        const check = () => world.weaponViews[id].children.length ? resolve() : setTimeout(check, 25);
+        const check = () => world.weaponViews[id].getObjectByName('weapon-model') ? resolve() : setTimeout(check, 25);
         check();
       });
       step(run, { ...emptyInput(run), fire: true, aimX: run.player.x, aimY: run.player.y - 150, aimPitch: 0 });

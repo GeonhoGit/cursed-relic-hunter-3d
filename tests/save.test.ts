@@ -125,7 +125,7 @@ describe('atomic local saves', () => {
       tx.objectStore('save').put({ schema: 1, content: 'prototype-0.1', revision: 5, savedAt: '2026-09-29', run, settings: defaultSettings() }, 'current'); tx.oncomplete = () => resolve(); });
     expect((await store.load())?.run).toEqual(run);
     const next = await store.save(run, defaultSettings());
-    expect(next.content).toBe('prototype-0.13'); expect(next.revision).toBe(6); expect(next.run).toEqual(run); db.close();
+    expect(next.content).toBe('prototype-0.16'); expect(next.revision).toBe(6); expect(next.run).toEqual(run); db.close();
   });
   it('restores fixed offers and chosen relics without granting a second selection', async () => {
     const store = new SaveStore(`reward-${++count}`); await store.load(); const s = createRun(42);

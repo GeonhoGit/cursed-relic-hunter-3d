@@ -2,6 +2,7 @@ import type { RunState } from './model';
 import { growthStats } from './growth';
 import { hasRelic } from './relics';
 import { currentRoom } from './dungeon';
+import { mossAfterCombat } from './relic-survival';
 
 export const CHALICE = { perKill: 2, roomCap: 12 } as const;
 
@@ -19,4 +20,4 @@ export function healOnKill(s: RunState) {
   const recovered = healLivingPlayer(s, Math.min(CHALICE.perKill, CHALICE.roomCap - healed));
   if (recovered > 0) room.chaliceHealed = Math.min(CHALICE.roomCap, healed + recovered);
 }
-export function healAfterCombat(s: RunState) { if (hasRelic(s, 'R54')) healLivingPlayer(s, 5); }
+export function healAfterCombat(s: RunState) { if (hasRelic(s, 'R54')) healLivingPlayer(s, 5); mossAfterCombat(s); }

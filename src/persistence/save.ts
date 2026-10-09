@@ -1,7 +1,8 @@
 import { validMouseSensitivity } from '../core/settings';
 import { validGraphicsMode } from '../core/render-timing';
 import type { Investment, RunState, WeaponId } from '../core/model';
-import { defaultProfile, earnedPoints, investedPoints, recordGrowth, validProfile } from '../core/growth';
+import { defaultProfile, earnedPoints, growthRelicUnlocks, investedPoints, recordGrowth, validProfile } from '../core/growth';
+import { validKeyBindings } from '../core/keybindings';
 import { weaponUnlocked } from '../core/weapons';
 import { validRecord, validRun } from './save-validation';
 import type { SaveRecord, Settings } from './save-types';
@@ -56,6 +57,7 @@ export class SaveStore {
       if (copy.run && !validRun(copy.run)) throw new CorruptSaveError();
       if (copy.settings.mouseSensitivity !== undefined && !validMouseSensitivity(copy.settings.mouseSensitivity)) throw new CorruptSaveError();
       if (copy.settings.graphicsQuality !== undefined && !validGraphicsMode(copy.settings.graphicsQuality)) throw new CorruptSaveError();
+      if(copy.settings.bindings!==undefined&&!validKeyBindings(copy.settings.bindings))throw new CorruptSaveError();
       const db = await this.db();
       return new Promise<SaveRecord>((resolve, reject) => {
         const tx = db.transaction('save', 'readwrite'), objectStore = tx.objectStore('save');
@@ -74,10 +76,11 @@ export class SaveStore {
               : !copy.run.growth && !previous.run.growth && copy.run.seed === previous.run.seed);
           if (!validProfile(profile) || (copy.run?.growth?.firstRoomCleared && !profile.rooms.length) || (copy.weapon !== undefined && !weaponUnlocked(profile, copy.weapon))
             || (copy.run?.weapon && !weaponUnlocked(profile, copy.run.weapon) && !continuedStaff)
+            || copy.run?.growth?.relicUnlocks?.some(id => !growthRelicUnlocks(profile).includes(id))
             || (copy.run?.growth && investedPoints(copy.run.growth.investment) > earnedPoints(profile))) {
             error = new CorruptSaveError(); tx.abort(); return;
           }
-          record = { schema: 1, content: 'prototype-0.13', revision: this.revision + 1,
+          record = { schema: 1, content: 'prototype-0.16', revision: this.revision + 1,
             savedAt: new Date().toISOString(), run: copy.run, settings: copy.settings, profile };
           objectStore.put(record, 'current');
         };

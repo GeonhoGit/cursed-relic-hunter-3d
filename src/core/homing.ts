@@ -7,13 +7,14 @@ import { heartProtected } from './heart-boss';
 export const HOMING = { range: 150, turnPerSecond: Math.PI / 3 } as const;
 
 export function guideProjectile(s: RunState, b: Bullet, walls: readonly Box[]) {
-  if (!hasRelic(s, 'R05') || b.owner !== 'player' || b.kind === 'reflected' || b.phase === 'return') return;
+  if (!hasRelic(s, 'R05') || b.owner !== 'player' || b.kind === 'reflected' || b.kind === 'ally' || b.phase === 'return') return;
   const vertical = b.height !== undefined;
   const speed = Math.hypot(b.vx, b.vy, vertical ? b.heightVelocity ?? 0 : 0);
   if (speed < 1e-9) return;
   let target: Enemy | Boss | undefined, nearest = Infinity;
   let dx = 0, dy = 0, dz = 0;
   for (const e of [...s.enemies, ...(s.boss ? [s.boss] : [])]) {
+    if ('charm' in e && e.charm) continue;
     if (e.hp <= 0 || b.hitIds?.includes(e.id) || b.originTargetId === e.id
       || isBoss(e) && (e.mode === 'transition' || heartProtected(e))) continue;
     const x = e.x - b.x, y = e.y - b.y, z = vertical ? BODY_HEIGHT[e.kind] / 2 - b.height! : 0;
